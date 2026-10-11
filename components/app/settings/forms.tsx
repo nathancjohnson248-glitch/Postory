@@ -62,7 +62,7 @@ export function ProfileForm({ name, email, timezone }: { name: string; email: st
   const zones = useMemo(() => listTimeZones(timezone), [timezone]);
   return (
     <form
-      className="grid gap-5 sm:grid-cols-2"
+      className="grid grid-cols-1 gap-5 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
@@ -97,7 +97,7 @@ export function BusinessForm(props: { businessName: string; businessDescription:
   const { pending, save } = useSave();
   return (
     <form
-      className="grid gap-5 sm:grid-cols-2"
+      className="grid grid-cols-1 gap-5 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         const f = Object.fromEntries(new FormData(e.currentTarget).entries()) as Record<string, string>;
@@ -209,7 +209,7 @@ export function AiPreferencesForm({ defaultPlatforms, emoji, hashtags }: { defau
         </div>
         <p className="mt-2 text-[12.5px] text-muted">Leave empty to use whichever networks you&apos;ve connected.</p>
       </fieldset>
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Field label="Emoji" htmlFor="ai-emoji">
           <Select id="ai-emoji" value={emojiPref} onChange={(e) => setEmoji(e.target.value)}>
             <option value="voice">Only if my voice calls for it</option>
@@ -257,7 +257,7 @@ export function MemoryManager({ rows }: { rows: MemoryRow[] }) {
   return (
     <div className="flex flex-col gap-6">
       <form
-        className="grid gap-3 rounded-2xl bg-wash p-4 sm:grid-cols-[160px_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end"
+        className="grid grid-cols-1 gap-3 rounded-2xl bg-wash p-4 sm:grid-cols-[160px_minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           const form = e.currentTarget;

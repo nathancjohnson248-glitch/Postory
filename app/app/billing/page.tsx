@@ -62,7 +62,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </Notice>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <section className="rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line sm:p-7">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -84,7 +84,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           </div>
 
           {subscription ? (
-            <dl className="mt-7 grid gap-4 border-t border-line pt-6 sm:grid-cols-2">
+            <dl className="mt-7 grid grid-cols-1 gap-4 border-t border-line pt-6 sm:grid-cols-2">
               {subscription.status === "trialing" && subscription.trial_ends_at ? (
                 <div>
                   <dt className="text-[13px] text-muted">Trial ends</dt>

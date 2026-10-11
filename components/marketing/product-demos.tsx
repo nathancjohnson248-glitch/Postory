@@ -10,7 +10,7 @@ import { PostPreview } from "@/components/product/post-preview";
 import { PostStatusBadge } from "@/components/product/status-badge";
 import { DEMO_LABEL, demoAnalytics, demoBusiness, demoCalendar, demoPosts, demoStory } from "@/lib/demo/data";
 import type { PostStatus } from "@/lib/posts/state-machine";
-import { PLATFORM_META } from "@/lib/social/platforms";
+import { PLATFORM_META, countCharacters } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
 function DemoTag({ className }: { className?: string }) {
@@ -27,7 +27,8 @@ export function HeroProduct() {
   const posts = demoPosts.filter((p) => p.platform !== "instagram").slice(0, 3);
   return (
     <div className="relative">
-      <div className="absolute -inset-x-10 -bottom-10 -top-6 -z-10 rounded-[48px] bg-gradient-to-b from-blue-50/70 to-transparent" aria-hidden />
+      <div className="glow-breathe absolute -inset-x-10 -bottom-10 -top-6 -z-10 rounded-[48px] bg-gradient-to-b from-blue-50/80 to-transparent" aria-hidden />
+      <div className="glow-breathe absolute left-1/2 top-1/3 -z-10 h-64 w-[70%] -translate-x-1/2 rounded-full bg-blue-400/15 blur-3xl" aria-hidden />
       <div className="overflow-hidden rounded-[28px] bg-surface shadow-float ring-1 ring-line">
         <div className="flex items-center justify-between border-b border-line px-5 py-3">
           <div className="flex items-center gap-2">
@@ -36,7 +37,7 @@ export function HeroProduct() {
           </div>
           <DemoTag />
         </div>
-        <div className="grid lg:grid-cols-[0.95fr_1.6fr]">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.6fr)]">
           <div className="border-b border-line p-6 lg:border-b-0 lg:border-r">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">What happened?</p>
             <p className="mt-3 font-display text-[28px] leading-[1.2] tracking-[-0.01em]">{demoStory.source}</p>
@@ -46,7 +47,7 @@ export function HeroProduct() {
                   key={s}
                   initial={reduce ? false : { opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + i * 0.25 }}
+                  transition={{ delay: 1.15 + i * 0.22, ease: [0.22, 1, 0.36, 1] }}
                   className="flex items-center gap-2.5 text-[13px] text-muted"
                 >
                   <span className="grid size-5 place-items-center rounded-full bg-blue-500 text-white">
@@ -64,14 +65,14 @@ export function HeroProduct() {
               ))}
             </div>
           </div>
-          <div className="grid gap-3 bg-paper/60 p-4 sm:grid-cols-2 lg:p-5">
+          <div className="grid grid-cols-1 gap-3 bg-paper/60 p-4 sm:grid-cols-2 lg:p-5">
             {posts.map((post, i) => (
               <motion.div
                 key={post.platform}
                 initial={reduce ? false : { opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.2 + i * 0.12, type: "spring", stiffness: 160, damping: 22 }}
-                className={cn("rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line", i === 2 && "sm:col-span-2")}
+                transition={{ delay: 1.9 + i * 0.12, type: "spring", stiffness: 160, damping: 22 }}
+                className={cn("rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line", i === 2 && "hidden sm:col-span-2 sm:block")}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <span className="flex items-center gap-2 text-[13px] font-semibold">
@@ -90,12 +91,40 @@ export function HeroProduct() {
   );
 }
 
+/** How much of the network's limit a post uses — pinned to the card's foot. */
+function CharacterMeter({ used, limit }: { used: number; limit: number }) {
+  const share = Math.min(1, used / limit);
+  return (
+    <div className="shrink-0 pt-4">
+      <div className="flex items-baseline justify-between font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint">
+        <span>Fits the limit</span>
+        <span className="tabular-nums text-muted">
+          {used.toLocaleString("en-US")} / {limit.toLocaleString("en-US")}
+        </span>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-wash">
+        <motion.div
+          className="h-full rounded-full bg-blue-500"
+          initial={{ width: 0 }}
+          whileInView={{ width: `${Math.max(2, share * 100)}%` }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** Side-by-side platform versions — same facts, native voice. */
 export function PlatformVersions() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {demoPosts.map((post) => (
-        <div key={post.platform} className="flex flex-col rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line">
+    <>
+      <div className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-3 scrollbar-none sm:-mx-8 sm:scroll-px-8 sm:px-8 md:mx-0 md:grid md:grid-cols-2 md:gap-4 md:overflow-visible md:px-0 md:pb-0 xl:grid-cols-4">
+        {demoPosts.map((post) => (
+          <div
+            key={post.platform}
+            className="flex h-[380px] w-[84%] shrink-0 snap-start flex-col rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line md:h-auto transition-[transform,box-shadow] duration-500 ease-[var(--ease-out-soft)] sm:w-[58%] md:w-auto md:hover:-translate-y-1 md:hover:shadow-lift"
+          >
           <div className="mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2 text-[14px] font-semibold">
               <PlatformIcon platform={post.platform} tile className="size-7 rounded-lg" />
@@ -103,6 +132,7 @@ export function PlatformVersions() {
             </span>
             <DemoTag />
           </div>
+          <div className="relative min-h-0 flex-1 overflow-hidden max-md:[mask-image:linear-gradient(to_bottom,black_78%,transparent)]">
           <PostPreview
             platform={post.platform}
             content={post.content}
@@ -110,9 +140,13 @@ export function PlatformVersions() {
             handle={demoBusiness.handle}
             media={post.image ? [{ kind: "image", url: post.image, alt: "Example launch graphic" }] : []}
           />
-        </div>
-      ))}
-    </div>
+          </div>
+          <CharacterMeter used={countCharacters(post.content)} limit={PLATFORM_META[post.platform].charLimit} />
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-center text-[12px] text-faint md:hidden">Swipe to compare networks →</p>
+    </>
   );
 }
 
@@ -123,29 +157,35 @@ export function ApprovalDemo() {
   return (
     <div className="rounded-3xl bg-surface shadow-lift ring-1 ring-line">
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-[15px] font-semibold">{pending ? `${pending} posts need review` : "Everything's approved"}</p>
           <p className="text-[12.5px] text-muted">{demoStory.title}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <DemoTag />
+        <div className="flex shrink-0 items-center gap-2">
+          <DemoTag className="hidden sm:inline" />
           <button
             type="button"
             onClick={() => setStatuses((s) => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v === "awaiting_review" ? "approved" : v])) as Record<string, PostStatus>)}
             disabled={!pending}
-            className="flex h-9 items-center gap-1.5 rounded-xl bg-blue-500 px-3.5 text-[13px] font-medium text-white transition-all hover:bg-blue-600 disabled:opacity-40"
+            className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl bg-blue-500 px-3.5 text-[13px] font-medium text-white transition-all hover:bg-blue-600 active:scale-[0.97] disabled:opacity-40"
           >
             <CheckCheck className="size-4" aria-hidden /> Approve all
           </button>
         </div>
       </div>
       <ul className="divide-y divide-line">
-        {demoPosts.map((post) => (
+        {demoPosts.map((post, i) => (
           <li key={post.platform} className="flex items-center gap-3.5 px-5 py-3.5">
             <PlatformIcon platform={post.platform} tile className="size-8 rounded-[10px]" />
             <p className="min-w-0 flex-1 truncate text-[13.5px] text-ink-soft">{post.content.replace(/\s+/g, " ")}</p>
             <AnimatePresence mode="wait" initial={false}>
-              <motion.span key={statuses[post.platform]} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+              <motion.span
+                key={statuses[post.platform]}
+                initial={{ opacity: 0, scale: 0.85, y: 4 }}
+                animate={{ opacity: 1, scale: 1, y: 0, transition: { delay: i * 0.07, type: "spring", stiffness: 420, damping: 26 } }}
+                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+                className="shrink-0"
+              >
                 <PostStatusBadge status={statuses[post.platform]} />
               </motion.span>
             </AnimatePresence>
@@ -238,7 +278,7 @@ export function MemoryDemo() {
           ))}
         </ul>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-3xl bg-surface p-5 ring-1 ring-line">
           <p className="flex items-center gap-1.5 text-[12px] font-medium text-success">
             <Check className="size-3.5" aria-hidden /> Postory writes

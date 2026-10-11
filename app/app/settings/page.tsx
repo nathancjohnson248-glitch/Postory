@@ -64,7 +64,7 @@ export default async function SettingsPage() {
         <ConnectionReturnToast />
       </Suspense>
       <PageHeader title="Settings" description="Your profile, your business, and what Postory can do on your behalf." />
-      <div className="grid gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="hidden lg:block">
           <ul className="sticky top-10 flex flex-col gap-0.5">
             {NAV.map(([id, label]) => (

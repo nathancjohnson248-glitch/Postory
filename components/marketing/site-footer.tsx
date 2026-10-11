@@ -13,7 +13,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-paper">
       <div className="mx-auto max-w-7xl px-5 pb-10 pt-16 sm:px-8">
-        <div className="grid gap-12 lg:grid-cols-[1.3fr_repeat(4,1fr)]">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))]">
           <div>
             <Logo />
             <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-muted">Your business doesn&apos;t stop. Neither should your social.</p>

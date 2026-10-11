@@ -16,7 +16,7 @@ export function PlanCards({
   dense?: boolean;
 }) {
   return (
-    <div className={cn("grid gap-4 lg:grid-cols-3", className)}>
+    <div className={cn("grid grid-cols-1 gap-4 lg:grid-cols-3", className)}>
       {PLAN_IDS.map((id) => {
         const plan = PLANS[id];
         const featured = id === "pro";

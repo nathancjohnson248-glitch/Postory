@@ -85,7 +85,7 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <blockquote className="rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line sm:p-8">
           <p className="font-display text-[26px] leading-[1.3] tracking-[-0.01em] text-ink sm:text-[30px]">“{story.source_text}”</p>
           {story.summary ? <p className="mt-5 border-t border-line pt-4 text-[14px] leading-relaxed text-muted">{story.summary}</p> : null}
@@ -125,7 +125,7 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
       ) : null}
 
       {posts.length ? (
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           {posts.map((post) => (
             <PostCard
               key={post.id}

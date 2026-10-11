@@ -139,7 +139,7 @@ export function CalendarBoard({
   );
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
       <div className="min-w-0">
         {header}
         {view === "month" ? (

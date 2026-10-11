@@ -69,7 +69,7 @@ export function BusinessStep({
           aria-invalid={Boolean(e.businessDescription) || undefined}
         />
       </Field>
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Field label="Business type" htmlFor="businessType" error={e.businessType}>
           <Select id="businessType" name="businessType" defaultValue={defaults.businessType || ""} required aria-invalid={Boolean(e.businessType) || undefined}>
             <option value="" disabled>

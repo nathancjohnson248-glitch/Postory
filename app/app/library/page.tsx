@@ -194,7 +194,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
             <li key={s.id}>
               <Link
                 href={`/app/library/${s.id}`}
-                className="group grid gap-4 rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                className="group grid grid-cols-1 gap-4 rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lift sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
               >
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-3">

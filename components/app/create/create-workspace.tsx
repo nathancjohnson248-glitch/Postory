@@ -22,7 +22,7 @@ export function CreateWorkspace(props: {
     );
   }
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
       <Composer connected={props.connected} defaultPlatforms={props.defaultPlatforms} availability={props.availability} text={text} onTextChange={setText} />
       <AssistantPanel enabled={props.assistant.enabled} disabledReason={props.assistant.reason} timezone={props.timezone} onUseStory={setText} />
     </div>

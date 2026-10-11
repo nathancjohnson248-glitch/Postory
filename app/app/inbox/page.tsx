@@ -77,7 +77,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         ))}
       </nav>
       {items?.length ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {items.map((i) => (
             <InboxItem
               key={i.id}

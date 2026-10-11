@@ -44,7 +44,7 @@ export function Field({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       <Label htmlFor={htmlFor} className="flex items-baseline justify-between">
-        <span>{label}</span>
+        <span className="min-w-0 flex-1">{label}</span>
         {optional ? <span className="text-xs font-normal text-faint">Optional</span> : null}
       </Label>
       {children}

@@ -29,7 +29,7 @@ export default function FeaturesPage() {
         title={<>The publishing side of your business, <em className="text-blue-600">handled.</em></>}
         body="Postory is built around one loop: tell it what happened, review what it writes, publish everywhere. Every feature serves that loop."
       />
-      <section id="how-it-works" className="mx-auto grid max-w-7xl gap-4 px-5 pb-24 sm:grid-cols-2 sm:px-8 lg:grid-cols-4">
+      <section id="how-it-works" className="mx-auto grid grid-cols-1 max-w-7xl gap-4 px-5 pb-24 sm:grid-cols-2 sm:px-8 lg:grid-cols-4">
         {FEATURES.map((f) => (
           <div key={f.title} className="rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line">
             <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
@@ -52,7 +52,7 @@ export default function FeaturesPage() {
         </div>
       </section>
       <section id="integrations" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-24 sm:px-8">
-        <div className="grid gap-10 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
           {[
             ["Publishing", "Posts are published and scheduled through LetMePost, with preflight checks and idempotent requests so a retry never posts twice."],
             ["Billing", "Subscriptions run on HandyPay's hosted checkout. Card details never touch Postory."],

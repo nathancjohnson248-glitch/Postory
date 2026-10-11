@@ -59,7 +59,7 @@ export function StoryFanout({ className, compact = false }: { className?: string
             transition={{ delay: 0.35 + i * 0.09, type: "spring", stiffness: 160, damping: 22 }}
             className="rounded-2xl bg-surface p-4 shadow-soft ring-1 ring-line"
           >
-            <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
               <span className="flex items-center gap-2 text-[13px] font-semibold">
                 <PlatformIcon platform={post.platform} tile className="size-6 rounded-[7px]" />
                 {PLATFORM_META[post.platform].name}

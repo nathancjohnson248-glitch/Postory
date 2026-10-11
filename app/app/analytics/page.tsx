@@ -58,7 +58,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             <p className="mt-4 text-[56px] font-semibold leading-none tracking-[-0.04em] tabular-nums sm:text-[72px]">{data.totals.published}</p>
             <p className="mt-2 text-[15px] text-white/70">posts published</p>
             {data.headlines.length ? (
-              <ul className="mt-7 grid gap-2 border-t border-white/10 pt-6 sm:grid-cols-2">
+              <ul className="mt-7 grid grid-cols-1 gap-2 border-t border-white/10 pt-6 sm:grid-cols-2">
                 {data.headlines.slice(1).map((h) => (
                   <li key={h} className="text-[15px] leading-snug text-white/90">
                     {h}
@@ -68,7 +68,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             ) : null}
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
             <Section title="Posts published per week" description="Last 8 weeks, in your timezone.">
               <div className="px-4 pb-5 pt-4">
                 <ColumnChart data={data.weekly} label="Posts published per week" unit="posts" />
@@ -97,7 +97,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             </Section>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Section title="Stories that travelled furthest" description="By number of networks published to.">
               {data.topStories.length ? (
                 <ul className="flex flex-col px-2 pb-2">
@@ -135,7 +135,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </div>
 
           {advanced ? (
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <Section title="Days you publish">
                 <div className="px-4 pb-5 pt-4">
                   <ColumnChart data={data.advanced.weekdays} label="Posts published by weekday" unit="posts" height={140} highlightLast={false} />
