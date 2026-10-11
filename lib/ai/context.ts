@@ -3,13 +3,20 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { BusinessContext } from "./prompts";
 
+export function readPreferences(value: unknown): BusinessContext["preferences"] {
+  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const emoji = v.emoji === "never" || v.emoji === "sparingly" || v.emoji === "voice" ? v.emoji : "voice";
+  const hashtags = v.hashtags === "never" || v.hashtags === "sparingly" || v.hashtags === "platform" ? v.hashtags : "platform";
+  return { emoji, hashtags };
+}
+
 /** Everything the model is allowed to know about the business. */
 export async function loadBusinessContext(userId: string): Promise<BusinessContext> {
   const supabase = await createClient();
   const [{ data: profile }, { data: memory }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("business_name,business_type,business_description,website_url")
+      .select("business_name,business_type,business_description,website_url,ai_preferences")
       .eq("id", userId)
       .maybeSingle(),
     supabase
@@ -29,6 +36,7 @@ export async function loadBusinessContext(userId: string): Promise<BusinessConte
     businessDescription: profile?.business_description ?? null,
     websiteUrl: profile?.website_url ?? null,
     voice,
+    preferences: readPreferences(profile?.ai_preferences),
     memory: memory ?? [],
   };
 }

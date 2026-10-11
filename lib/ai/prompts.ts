@@ -26,8 +26,12 @@ export type BusinessContext = {
   businessDescription: string | null;
   websiteUrl: string | null;
   voice: string | null;
+  preferences: { emoji: "never" | "sparingly" | "voice"; hashtags: "never" | "sparingly" | "platform" };
   memory: { category: string; key: string; value: string }[];
 };
+
+const EMOJI_RULE = { never: "Never use emoji.", sparingly: "At most one emoji, only if it adds something.", voice: "Use emoji only if the brand voice calls for it." };
+const HASHTAG_RULE = { never: "Never use hashtags.", sparingly: "At most one or two relevant hashtags.", platform: "Use hashtags only where the platform expects them (e.g. Instagram)." };
 
 export function renderBusinessContext(ctx: BusinessContext) {
   const lines = [
@@ -36,6 +40,8 @@ export function renderBusinessContext(ctx: BusinessContext) {
     ctx.businessDescription ? `What they do: ${ctx.businessDescription}` : null,
     ctx.websiteUrl ? `Website: ${ctx.websiteUrl}` : null,
     ctx.voice ? `Brand voice: ${ctx.voice}` : "Brand voice: clear, human, confident; not salesy.",
+    `Emoji: ${EMOJI_RULE[ctx.preferences.emoji]}`,
+    `Hashtags: ${HASHTAG_RULE[ctx.preferences.hashtags]}`,
   ].filter(Boolean);
   const memory = ctx.memory
     .filter((m) => m.category !== "voice")
