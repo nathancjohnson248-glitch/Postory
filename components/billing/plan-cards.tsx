@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Check } from "lucide-react";
-import { PLANS, PLAN_IDS, TRIAL_DAYS, planHighlights, type PlanId } from "@/lib/billing/plans";
+import { PLANS, PLAN_IDS, planHighlights, type PlanId } from "@/lib/billing/plans";
 import { cn } from "@/lib/utils";
 
 /** Presentational plan cards shared by pricing, onboarding and billing. */
@@ -26,7 +26,7 @@ export function PlanCards({
             key={id}
             className={cn(
               "relative flex flex-col rounded-3xl p-6",
-              featured ? "bg-ink text-white shadow-float lg:-my-3 lg:py-9" : "bg-surface text-ink shadow-soft ring-1 ring-line",
+              featured ? "order-first bg-ink text-white shadow-float lg:order-none lg:-my-3 lg:py-9" : "bg-surface text-ink shadow-soft ring-1 ring-line",
             )}
           >
             <div className="flex items-center justify-between">
@@ -42,7 +42,7 @@ export function PlanCards({
             </p>
             <p className={cn("mt-2 text-sm", featured ? "text-white/70" : "text-muted")}>{plan.tagline}</p>
             <div className="mt-6">{renderAction(id)}</div>
-            <p className={cn("mt-3 text-center text-xs", featured ? "text-white/50" : "text-faint")}>{TRIAL_DAYS}-day trial</p>
+            <p className={cn("mt-3 text-center text-xs", featured ? "text-white/50" : "text-faint")}>Cancel anytime</p>
             <ul className={cn("mt-6 flex flex-col gap-2.5 border-t pt-6 text-[13.5px]", featured ? "border-white/10" : "border-line")}>
               {(dense ? highlights.slice(0, 5) : highlights).map((h) => (
                 <li key={h} className="flex items-start gap-2.5">
