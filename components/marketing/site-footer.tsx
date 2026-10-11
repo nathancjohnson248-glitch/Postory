@@ -4,8 +4,8 @@ import { site } from "@/lib/site";
 
 const COLUMNS = [
   { title: "Product", links: [{ href: "/features", label: "Features" }, { href: "/pricing", label: "Pricing" }, { href: "/changelog", label: "Changelog" }, { href: "/changelog#roadmap", label: "Roadmap" }] },
-  { title: "Resources", links: [{ href: "/features#how-it-works", label: "Docs" }, { href: `mailto:${site.founder.email}?subject=Postory%20help`, label: "Help" }, { href: "/changelog", label: "Blog" }, { href: "/features#integrations", label: "API" }] },
-  { title: "Company", links: [{ href: "/#about", label: "About" }, { href: `mailto:${site.founder.email}`, label: "Contact" }] },
+  { title: "Free tools", links: [{ href: "/tools/character-counter", label: "Character counter" }, { href: "/features#how-it-works", label: "How it works" }] },
+  { title: "Company", links: [{ href: "/about", label: "About" }, { href: `mailto:${site.founder.email}?subject=Postory%20help`, label: "Help" }, { href: `mailto:${site.founder.email}`, label: "Contact" }] },
   { title: "Legal", links: [{ href: "/privacy", label: "Privacy" }, { href: "/terms", label: "Terms" }] },
 ];
 

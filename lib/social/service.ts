@@ -15,6 +15,7 @@ import "server-only";
 
 import { env, integrations } from "@/lib/env";
 import { describeSocialError, UserFacingError } from "@/lib/errors";
+import { notifyUser } from "@/lib/email/notify";
 import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { consumeUsage, getEntitlements, assertActivePlan, canConnectAnotherAccount } from "@/lib/entitlements";
@@ -325,10 +326,16 @@ export async function syncAccounts(userId: string) {
 
   const missing = local.filter((a) => !remoteIds.has(a.external_account_id));
   if (missing.length) {
-    await admin
+    const { data: broken } = await admin
       .from("social_accounts")
       .update({ status: "reconnect_required", last_synced_at: new Date().toISOString() })
-      .in("id", missing.map((a) => a.id));
+      .in("id", missing.map((a) => a.id))
+      .eq("status", "connected")
+      .select("platform");
+    // Only accounts that just stopped working; already-flagged ones were reported before.
+    for (const platform of new Set((broken ?? []).map((a) => a.platform))) {
+      notifyUser(userId, "connectionIssue", { network: PLATFORM_META[platform as Platform]?.name ?? platform });
+    }
   }
   return listConnectedAccounts(userId);
 }
@@ -747,7 +754,23 @@ async function refreshPostFromProvider(userId: string, post: StoryPost) {
     update.scheduled_for = null;
     update.external_post_id = null;
   }
-  const { data } = await admin.from("story_posts").update(update).eq("id", post.id).eq("user_id", userId).select("*").single();
+  // Conditional on the status we read, so concurrent reconciles agree on who
+  // made the transition (and only that one sends the alert).
+  const { data } = await admin
+    .from("story_posts")
+    .update(update)
+    .eq("id", post.id)
+    .eq("user_id", userId)
+    .eq("status", post.status)
+    .select("*")
+    .maybeSingle();
+  if (data && next === "failed" && post.status !== "failed") {
+    notifyUser(userId, "publishFailed", {
+      network: PLATFORM_META[post.platform as Platform]?.name ?? post.platform,
+      reason: update.error_message ?? "The network rejected the post.",
+      storyId: post.story_id,
+    });
+  }
   return data ?? post;
 }
 

@@ -172,7 +172,7 @@ export function CalendarBoard({
                       if (id && !past) moveTo(id, d.key);
                     }}
                     className={cn(
-                      "min-h-28 border-line p-1.5 transition-colors sm:min-h-32",
+                      "min-h-[4.5rem] border-line p-1 transition-colors sm:min-h-32 sm:p-1.5",
                       i % 7 !== 6 && "border-r",
                       i < 35 && "border-b",
                       !d.inMonth && "bg-paper/70",

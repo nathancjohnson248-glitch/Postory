@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 const LINKS = [
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/changelog", label: "Changelog" },
+  { href: "/tools/character-counter", label: "Free tools" },
+  { href: "/about", label: "About" },
 ];
 
 export function SiteHeader() {
