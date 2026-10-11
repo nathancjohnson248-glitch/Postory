@@ -73,9 +73,15 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
           {story.source_type === "voice" ? " · dictated" : ""}
           {story.status === "archived" ? " · archived" : ""}
         </p>
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <h1 className="font-display text-[48px] uppercase leading-[0.95] tracking-[-0.01em] text-balance sm:text-[64px]">{story.title}</h1>
-          <StoryToolbar storyId={story.id} archived={story.status === "archived"} reviewCount={reviewCount} />
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <h1
+            className={`min-w-0 max-w-4xl font-display leading-[0.98] tracking-[-0.02em] text-balance ${story.title.length > 36 ? "text-[40px] sm:text-[52px]" : "text-[48px] sm:text-[68px]"}`}
+          >
+            {story.title}
+          </h1>
+          <div className="xl:shrink-0">
+            <StoryToolbar storyId={story.id} archived={story.status === "archived"} reviewCount={reviewCount} />
+          </div>
         </div>
       </div>
 

@@ -79,7 +79,9 @@ export async function createManualStory(input: { sourceText: string; platforms: 
     const parsed = CreateStorySchema.safeParse({ sourceText: input.sourceText, sourceType: "manual", platforms: input.platforms });
     if (!parsed.success) throw new UserFacingError("invalid", parsed.error.issues[0]?.message ?? "Check the story and networks.");
     const supabase = await createClient();
-    const title = parsed.data.sourceText.split(/[.!?\n]/)[0].trim().slice(0, 60) || "New story";
+    const firstSentence = parsed.data.sourceText.split(/[.!?\n]/)[0].trim();
+    const words = firstSentence.split(/\s+/);
+    const title = (words.length > 7 ? `${words.slice(0, 7).join(" ")}…` : firstSentence).slice(0, 80) || "New story";
     const { data: story, error } = await supabase
       .from("stories")
       .insert({ user_id: user.id, title, source_text: parsed.data.sourceText, source_type: "manual", status: "ready" })

@@ -54,7 +54,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-muted text-pretty">{heading.body}</p>
       </div>
 
-      <div className="animate-fade-up">
+      <div>
         {step === "business" ? (
           <div className="mx-auto max-w-xl rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line sm:p-8">
             <BusinessStep

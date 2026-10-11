@@ -121,7 +121,42 @@
   }
 }
 
+/* Page transitions (React <ViewTransition> + View Transitions API).
+   The shell (sidebar, header) stays put; only the page content moves. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-old(.page-exit) {
+  animation: 140ms cubic-bezier(0.4, 0, 1, 1) both pt-fade-out;
+}
+
+::view-transition-new(.page-enter) {
+  animation: 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both pt-rise;
+}
+
+@keyframes pt-fade-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes pt-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+
   *,
   *::before,
   *::after {

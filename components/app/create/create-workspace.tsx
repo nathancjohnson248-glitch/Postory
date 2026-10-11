@@ -10,10 +10,17 @@ export function CreateWorkspace(props: {
   connected: { platform: Platform; name: string }[];
   defaultPlatforms: Platform[];
   availability: GenerationAvailability;
-  assistant: { enabled: boolean; reason?: string };
+  assistant: { enabled: boolean; reason?: string; hidden?: boolean };
   timezone: string;
 }) {
   const [text, setText] = useState(props.initialText);
+  if (props.assistant.hidden) {
+    return (
+      <div className="max-w-4xl">
+        <Composer connected={props.connected} defaultPlatforms={props.defaultPlatforms} availability={props.availability} text={text} onTextChange={setText} />
+      </div>
+    );
+  }
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start">
       <Composer connected={props.connected} defaultPlatforms={props.defaultPlatforms} availability={props.availability} text={text} onTextChange={setText} />

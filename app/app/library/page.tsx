@@ -198,7 +198,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
               >
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-3">
-                    <h2 className="truncate font-display text-[26px] uppercase leading-none tracking-[-0.005em]">{s.title}</h2>
+                    <h2 className="truncate font-display text-[28px] leading-none tracking-[-0.015em]">{s.title}</h2>
                     <span className="shrink-0 text-xs text-faint">{formatInZone(s.created_at, tz, { month: "short", day: "numeric" })}</span>
                   </div>
                   <p className="mt-2 line-clamp-1 text-[14px] text-muted">{truncate(s.source_text, 180)}</p>

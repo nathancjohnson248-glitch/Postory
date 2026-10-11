@@ -26,10 +26,10 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
   const defaultPlatforms = Array.isArray(prefs?.defaultPlatforms) ? (prefs.defaultPlatforms.filter(isPlatform) as Platform[]) : [];
 
   let availability: GenerationAvailability;
-  let assistant: { enabled: boolean; reason?: string } = { enabled: true };
+  let assistant: { enabled: boolean; reason?: string; hidden?: boolean } = { enabled: true };
   if (!aiAvailable()) {
     availability = { ok: false, reason: "AI writing isn't switched on, so you'll write each network's version yourself." };
-    assistant = { enabled: false, reason: "The assistant isn't configured on this deployment yet." };
+    assistant = { enabled: false, hidden: true };
   } else if (!entitlements.active) {
     availability = {
       ok: false,
@@ -45,7 +45,14 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="What happened?" description="A launch, a milestone, a new hire, something you learned. Tell it plainly — Postory turns it into posts for each network and waits for your review." />
+      <PageHeader
+        title="What happened?"
+        description={
+          aiAvailable()
+            ? "A launch, a milestone, a new hire, something you learned. Tell it plainly — Postory turns it into posts for each network and waits for your review."
+            : "A launch, a milestone, a new hire, something you learned. Write it once, pick your networks, and shape each version before it goes out."
+        }
+      />
       <CreateWorkspace
         initialText={typeof text === "string" ? text.slice(0, 8000) : ""}
         connected={(accounts ?? []).map((a) => ({ platform: a.platform as Platform, name: a.username ?? a.display_name ?? a.platform }))}
