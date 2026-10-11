@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Mic, Sparkles } from "lucide-react";
+import { Mic, PenLine, Sparkles } from "lucide-react";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
+import { createManualStory } from "@/app/_actions/stories";
 import { GenerationProgress, type StageId } from "./generation-progress";
 import { useDictation } from "./use-dictation";
 
@@ -42,6 +43,7 @@ export function Composer({
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null);
+  const [writingManually, setWritingManually] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
 
   const dictation = useDictation((spoken) => {
@@ -55,6 +57,17 @@ export function Composer({
 
   const connectedSet = new Set(connected.map((c) => c.platform));
   const canGenerate = availability.ok && text.trim().length >= 8 && platforms.length > 0 && !running;
+  const canWriteManually = text.trim().length >= 8 && platforms.length > 0 && !running && !writingManually;
+
+  async function writeManually() {
+    if (!canWriteManually) return;
+    setWritingManually(true);
+    setError(null);
+    const result = await createManualStory({ sourceText: text.trim(), platforms });
+    // On success the action redirects to the story; only failures return here.
+    if (result && !result.ok) setError(result.error);
+    setWritingManually(false);
+  }
 
   async function generate() {
     if (!canGenerate) return;
@@ -239,9 +252,23 @@ export function Composer({
                   </>
                 )}
               </p>
-              <Button size="lg" variant="accent" disabled={!canGenerate} onClick={generate} icon={<Sparkles className="size-4" />}>
-                Generate posts
-              </Button>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <Button
+                  size="lg"
+                  variant={availability.ok ? "ghost" : "primary"}
+                  disabled={!canWriteManually}
+                  loading={writingManually}
+                  onClick={writeManually}
+                  icon={<PenLine className="size-4" />}
+                >
+                  Write posts myself
+                </Button>
+                {availability.ok ? (
+                  <Button size="lg" variant="accent" disabled={!canGenerate} onClick={generate} icon={<Sparkles className="size-4" />}>
+                    Generate posts
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </motion.div>
         )}

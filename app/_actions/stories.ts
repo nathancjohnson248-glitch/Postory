@@ -68,3 +68,44 @@ export async function deleteStory(storyId: string) {
   if (result.ok) redirect("/app/library");
   return result;
 }
+
+/**
+ * Create a story with a draft per network, written by the user (no AI).
+ * Each draft starts as the story text so it can be shaped per network.
+ */
+export async function createManualStory(input: { sourceText: string; platforms: string[] }) {
+  const result = await runAction("stories.createManual", async (user) => {
+    const { CreateStorySchema } = await import("@/lib/validation/schemas");
+    const parsed = CreateStorySchema.safeParse({ sourceText: input.sourceText, sourceType: "manual", platforms: input.platforms });
+    if (!parsed.success) throw new UserFacingError("invalid", parsed.error.issues[0]?.message ?? "Check the story and networks.");
+    const supabase = await createClient();
+    const title = parsed.data.sourceText.split(/[.!?\n]/)[0].trim().slice(0, 60) || "New story";
+    const { data: story, error } = await supabase
+      .from("stories")
+      .insert({ user_id: user.id, title, source_text: parsed.data.sourceText, source_type: "manual", status: "ready" })
+      .select("id")
+      .single();
+    if (error || !story) throw error ?? new Error("story insert failed");
+
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data: accounts } = await admin.from("social_accounts").select("id,platform").eq("user_id", user.id).eq("status", "connected");
+    const platforms = [...new Set(parsed.data.platforms)];
+    const { error: postsError } = await admin.from("story_posts").insert(
+      platforms.map((platform) => ({
+        story_id: story.id,
+        user_id: user.id,
+        platform,
+        content: parsed.data.sourceText,
+        status: "draft",
+        last_edited_by: "user",
+        social_account_id: accounts?.find((a) => a.platform === platform)?.id ?? null,
+      })),
+    );
+    if (postsError) throw postsError;
+    revalidatePath("/app", "layout");
+    return { storyId: story.id };
+  });
+  if (result.ok) redirect(`/app/library/${result.data.storyId}`);
+  return result;
+}

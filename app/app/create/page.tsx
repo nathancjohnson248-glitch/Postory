@@ -28,7 +28,7 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
   let availability: GenerationAvailability;
   let assistant: { enabled: boolean; reason?: string } = { enabled: true };
   if (!aiAvailable()) {
-    availability = { ok: false, reason: "Post generation isn't configured on this deployment yet." };
+    availability = { ok: false, reason: "AI writing isn't switched on, so you'll write each network's version yourself." };
     assistant = { enabled: false, reason: "The assistant isn't configured on this deployment yet." };
   } else if (!entitlements.active) {
     availability = {
