@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import * as billing from "@/lib/billing/service";
-import { PLANS } from "@/lib/billing/plans";
 import { getSubscriptionRow } from "@/lib/billing/service";
 import { planSchema } from "@/lib/validation/schemas";
 import { UserFacingError } from "@/lib/errors";
 import { runAction } from "./_run";
 
+/** Start a HandyPay checkout — for a first subscription or a plan change. */
 export async function startPlanCheckout(plan: string, returnPath: "/onboarding" | "/app/billing") {
   return runAction("billing.checkout", async (user) => {
     const parsed = planSchema.safeParse(plan);
@@ -17,21 +17,19 @@ export async function startPlanCheckout(plan: string, returnPath: "/onboarding" 
   });
 }
 
-export async function changeSubscriptionPlan(plan: string) {
-  return runAction("billing.changePlan", async (user) => {
-    const parsed = planSchema.safeParse(plan);
-    if (!parsed.success) throw new UserFacingError("invalid_plan", "Unknown plan.");
-    const sub = await billing.changePlan(user.id, parsed.data);
-    revalidatePath("/app", "layout");
-    return { plan: sub.plan ? PLANS[sub.plan as keyof typeof PLANS]?.name ?? sub.plan : null };
-  });
-}
-
 export async function cancelSubscriptionAction() {
   return runAction("billing.cancel", async (user) => {
     const sub = await billing.cancelSubscription(user.id);
     revalidatePath("/app", "layout");
     return { endsAt: sub.current_period_end };
+  });
+}
+
+export async function resumeSubscriptionAction() {
+  return runAction("billing.resume", async (user) => {
+    await billing.resumeSubscription(user.id);
+    revalidatePath("/app", "layout");
+    return { resumed: true };
   });
 }
 
@@ -47,7 +45,7 @@ export async function refreshSubscription() {
 export async function openBillingPortal() {
   return runAction("billing.portal", async (user) => {
     const url = await billing.getManagementUrl(user.id);
-    if (!url) throw new UserFacingError("no_portal", "HandyPay doesn't offer a self-serve page for this subscription.");
+    if (!url) throw new UserFacingError("no_subscription", "There's no subscription to manage yet.");
     return { url };
   });
 }

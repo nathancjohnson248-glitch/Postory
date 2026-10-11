@@ -30,6 +30,8 @@ export type Entitlements = {
   reason?: "no_subscription" | "trial_ended" | "subscription_inactive";
 };
 
+const RENEWAL_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
+
 const NO_LIMITS: PlanLimits = { socialAccounts: 0, aiGenerations: 0, aiConversations: 0, aiImages: 0, xCredits: 0 };
 const NO_FEATURES: PlanFeatures = {
   approvalWorkflow: true,
@@ -107,9 +109,12 @@ export function resolveEntitlements(input: {
       if (!active) reason = "trial_ended";
       break;
     case "active":
-    case "past_due": // grace period while the provider retries payment
-      active = !periodEnd || periodEnd > now || sub.status === "past_due";
+      // Small grace window for renewals that haven't been read back yet.
+      active = !periodEnd || periodEnd.getTime() + RENEWAL_GRACE_MS > now.getTime();
       if (!active) reason = "subscription_inactive";
+      break;
+    case "past_due": // the provider is still retrying payment
+      active = true;
       break;
     case "canceled":
       // Cancelled at period end keeps access until the paid period runs out.

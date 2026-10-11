@@ -36,7 +36,7 @@ export const env = {
   letmepostBaseUrl: () => (read("LETMEPOST_API_BASE_URL") ?? "https://api.letmepost.dev").replace(/\/+$/, ""),
 
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
-  handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me").replace(/\/+$/, ""),
+  handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
   openaiApiKey: () => read("OPENAI_API_KEY"),
   openaiModel: () => read("OPENAI_MODEL") ?? "gpt-5.4-mini",

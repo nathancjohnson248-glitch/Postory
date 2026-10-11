@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const result = await reconcileCheckout(user.id, event.data);
-    target.searchParams.set("billing", result.status === "completed" ? "confirmed" : "pending");
+    target.searchParams.set("billing", result.status === "completed" ? "confirmed" : result.status === "expired" ? "expired" : "pending");
     if (result.status === "completed" && result.subscription?.status === "trialing" && result.subscription.plan) {
       await sendEmail(user.email, "trialStarted", {
         planName: PLANS[result.subscription.plan].name,

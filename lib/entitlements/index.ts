@@ -6,6 +6,7 @@ import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { METRIC_LABEL, METRIC_LIMIT_KEY, type UsageMetric } from "@/lib/billing/plans";
+import { needsSync, syncSubscription } from "@/lib/billing/service";
 import { resolveEntitlements, type Entitlements } from "./resolve";
 
 export type { Entitlements } from "./resolve";
@@ -16,10 +17,12 @@ export const getEntitlements = cache(async (userId: string): Promise<Entitlement
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
-    .select("plan,status,trial_ends_at,current_period_start,current_period_end,cancel_at_period_end")
+    .select("plan,status,trial_ends_at,current_period_start,current_period_end,cancel_at_period_end,provider_subscription_id,last_synced_at")
     .eq("user_id", userId)
     .maybeSingle();
-  return resolveEntitlements({ subscription: data, now: new Date(), devPlan: env.devPlan() });
+  // No webhooks: if the mirror is stale or a trial/period just ended, re-read HandyPay first.
+  const subscription = data && needsSync(data) ? ((await syncSubscription(userId, { force: true })) ?? data) : data;
+  return resolveEntitlements({ subscription, now: new Date(), devPlan: env.devPlan() });
 });
 
 export class EntitlementError extends Error {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
 import { PageHeader } from "@/components/app/section";
-import { CancelSubscriptionButton, ChangePlanCards, ManageBillingButton, RefreshBillingButton } from "@/components/billing/billing-actions";
+import { CancelSubscriptionButton, ChangePlanCards, ManageBillingButton, RefreshBillingButton, ResumeSubscriptionButton } from "@/components/billing/billing-actions";
 import { PlanCards } from "@/components/billing/plan-cards";
 import { PlanPicker } from "@/components/billing/plan-picker";
 import { Badge } from "@/components/ui/badge";
@@ -49,12 +49,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       {params.billing === "error" ? <Notice tone="warning" title="We couldn't reach HandyPay to confirm your subscription. Refresh in a minute; you won't be charged twice." className="mb-6" /> : null}
       {params.checkout === "canceled" ? <Notice tone="info" title="Checkout was cancelled. No charge was made." className="mb-6" /> : null}
 
-      {!availability.configured || !availability.checkout ? (
-        <Notice tone="info" title="Billing isn't live yet." className="mb-6">
-          Postory&apos;s HandyPay connection is still being set up, so plans can&apos;t be purchased or changed here yet. Nothing has been or will be
-          charged until it is.
+      {!availability.configured ? (
+        <Notice tone="info" title="Billing isn't configured on this deployment." className="mb-6">
+          HANDYPAY_API_KEY is missing, so plans can&apos;t be purchased here. Nothing will be charged.
         </Notice>
       ) : null}
+      {params.billing === "expired" ? <Notice tone="info" title="That checkout expired before it was completed. No charge was made." className="mb-6" /> : null}
 
       {entitlements.source === "development_override" ? (
         <Notice tone="warning" title="Development plan override is on." className="mb-6">
@@ -107,6 +107,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <div className="mt-7 flex flex-wrap items-center gap-2">
             {live && availability.manage ? <ManageBillingButton /> : null}
             {live && availability.cancel && !subscription?.cancel_at_period_end ? <CancelSubscriptionButton periodEnd={fmt(subscription?.current_period_end ?? null)} /> : null}
+            {live && subscription?.cancel_at_period_end ? <ResumeSubscriptionButton /> : null}
             {subscription?.provider_subscription_id ? <RefreshBillingButton /> : null}
           </div>
         </section>

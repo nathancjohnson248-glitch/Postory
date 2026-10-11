@@ -1,29 +1,31 @@
 import "server-only";
 
 /**
- * HandyPay adapter — https://tryhandypay.com
+ * HandyPay adapter — https://tryhandypay.com (API: https://api.handypay.me/api)
  *
- * What is established (from HandyPay's own published integration notes):
- *   - API host: https://api.handypay.me (override with HANDYPAY_API_BASE_URL)
- *   - Requests authenticate with the account's API key (HANDYPAY_API_KEY)
- *   - Payment pages are hosted by HandyPay; card data never touches Postory
+ * Mapped from HandyPay's own published API client (the open-source
+ * "HandyPay Payments" WordPress plugin, class-handypay-api-client.php) and
+ * verified against the live API with read-only calls:
  *
- * What is NOT yet wired: the exact HandyPay endpoints and payloads for
- * subscription checkout, retrieval, plan changes and cancellation. HandyPay's
- * API reference wasn't reachable from the environment Postory was built in,
- * and Postory never guesses payment endpoints. Each operation below has its
- * Postory-side contract defined; until it is implemented against HandyPay's
- * documented API it reports `operation_not_mapped`, and the UI says billing
- * isn't available rather than faking a checkout.
+ *   Auth      Authorization: Bearer <HANDYPAY_API_KEY>
+ *   Envelope  { success: boolean, data?: T, error?: { code, message } }
+ *   Writes    Idempotency-Key header on every POST
  *
- * Wiring HandyPay = implementing the functions in `operations` below.
- * Nothing else in Postory needs to change. No webhooks are used: state is
- * read back from the API when the browser returns from checkout and when the
- * billing page loads.
+ *   POST /v1/subscription-sessions            hosted checkout in subscription mode
+ *   GET  /v1/payment-sessions/{id}            checkout outcome (+ subscription id)
+ *   GET  /v1/subscriptions/{id}               subscription state (Stripe-shaped)
+ *   POST /v1/subscriptions/{id}/cancel        { at_period_end }
+ *   POST /v1/subscriptions/{id}/resume        undo a scheduled cancellation
+ *   POST /v1/subscriptions/{id}/portal-session { return_url } -> { url }
+ *
+ * HandyPay runs on Stripe, so subscription objects follow Stripe's shape
+ * (unix-second timestamps, `items.data[].price`). No webhooks are used:
+ * Postory reads state back on checkout return and whenever it goes stale.
  */
 
 import { env, integrations } from "@/lib/env";
-import type { PlanId } from "./plans";
+import { log } from "@/lib/log";
+import { PLANS, isPlanId, type PlanId } from "./plans";
 
 export type ProviderSubscriptionStatus = "trialing" | "active" | "past_due" | "canceled" | "expired" | "incomplete";
 
@@ -41,98 +43,242 @@ export type ProviderSubscription = {
 
 export type CheckoutInput = {
   plan: PlanId;
-  priceMonthlyUsd: number;
   trialDays: number;
   customerEmail: string | null;
-  /** Postory's billing_events id — echoed back so the return can be reconciled. */
+  /** Reuse the HandyPay customer from an earlier subscription. */
+  customerReference: string | null;
+  /** Postory's billing_events id, echoed in metadata. */
   clientReference: string;
+  userId: string;
   successUrl: string;
   cancelUrl: string;
 };
 
 export type CheckoutSession = { url: string; reference: string };
 
-type Operations = {
-  /** Create a hosted subscription checkout and return its URL + HandyPay reference. */
-  createCheckout?: (input: CheckoutInput) => Promise<CheckoutSession>;
-  /** Look up what a completed checkout produced. null = not completed (yet). */
-  getCheckoutResult?: (checkoutReference: string) => Promise<ProviderSubscription | null>;
-  getSubscription?: (subscriptionReference: string) => Promise<ProviderSubscription>;
-  changePlan?: (subscriptionReference: string, plan: PlanId) => Promise<ProviderSubscription>;
-  cancelSubscription?: (subscriptionReference: string) => Promise<ProviderSubscription>;
-  /** HandyPay-hosted page where the customer manages payment details, if offered. */
-  getManagementUrl?: (subscriptionReference: string) => Promise<string | null>;
-};
-
-/**
- * Implementations go here once mapped to HandyPay's documented API, using
- * `handypayRequest` below for transport.
- */
-const operations: Operations = {};
-
-export type BillingOperation = keyof Operations;
+export type CheckoutOutcome =
+  | { state: "complete"; subscriptionReference: string; customerReference: string | null }
+  | { state: "open" }
+  | { state: "expired" };
 
 export class BillingUnavailableError extends Error {
   constructor(
-    public readonly code: "not_configured" | "operation_not_mapped" | "provider_error",
+    public readonly code: "not_configured" | "provider_error" | "account_suspended",
     message: string,
+    public readonly status?: number,
   ) {
     super(message);
     this.name = "BillingUnavailableError";
   }
 }
 
-/**
- * Shared HTTP transport for HandyPay calls. Server-only; the key never leaves
- * the server. `authHeaders` receives the API key and returns the header(s)
- * HandyPay's reference specifies — supplied by the operation implementation
- * so the auth scheme is written down exactly once, from the docs.
- */
-export async function handypayRequest<T>(
-  path: string,
-  init: { method?: string; body?: unknown; authHeaders: (apiKey: string) => Record<string, string> },
-): Promise<T> {
+// ---------------------------------------------------------------------------
+// Transport
+// ---------------------------------------------------------------------------
+
+type Envelope<T> = { success?: boolean; data?: T; error?: { code?: string; message?: string } };
+
+async function request<T>(method: "GET" | "POST", path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
   const key = env.handypayApiKey();
-  if (!key) throw new BillingUnavailableError("not_configured", "HandyPay isn't configured.");
-  const response = await fetch(`${env.handypayBaseUrl()}${path}`, {
-    method: init.method ?? "GET",
-    headers: {
-      Accept: "application/json",
-      ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...init.authHeaders(key),
-    },
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
+  if (!key) throw new BillingUnavailableError("not_configured", "Billing isn't configured on this deployment yet.");
+
+  const headers: Record<string, string> = { Authorization: `Bearer ${key}`, Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (method === "POST") headers["Idempotency-Key"] = idempotencyKey ?? crypto.randomUUID();
+
+  let response: Response;
+  try {
+    response = await fetch(`${env.handypayBaseUrl()}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (error) {
+    log.warn("handypay request failed", { operation: `${method} ${path}`, provider: "handypay" }, error);
+    throw new BillingUnavailableError("provider_error", "Couldn't reach HandyPay. Try again in a moment.");
+  }
+
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as T) : (null as T);
-  if (!response.ok) throw new BillingUnavailableError("provider_error", `HandyPay returned HTTP ${response.status}.`);
-  return payload;
+  let payload: Envelope<T> | T | null = null;
+  try {
+    payload = text ? (JSON.parse(text) as Envelope<T>) : null;
+  } catch {
+    payload = null;
+  }
+
+  const envelope = payload && typeof payload === "object" && "success" in (payload as object) ? (payload as Envelope<T>) : null;
+  const errorCode = envelope?.error?.code ?? "";
+
+  if (response.status === 403 && errorCode === "account_suspended") {
+    log.error("handypay account suspended", { operation: `${method} ${path}`, provider: "handypay" });
+    throw new BillingUnavailableError("account_suspended", "Billing is temporarily unavailable. Please try again later.", 403);
+  }
+  if (envelope) {
+    if (envelope.success) return (envelope.data ?? (envelope as unknown)) as T;
+    log.warn("handypay error response", { operation: `${method} ${path}`, provider: "handypay", status: response.status, code: errorCode });
+    throw new BillingUnavailableError("provider_error", envelope.error?.message || "HandyPay couldn't complete that request.", response.status);
+  }
+  if (response.ok) return (payload ?? {}) as T;
+  log.warn("handypay http error", { operation: `${method} ${path}`, provider: "handypay", status: response.status });
+  throw new BillingUnavailableError("provider_error", `HandyPay returned HTTP ${response.status}.`, response.status);
 }
 
-function require<K extends BillingOperation>(op: K): NonNullable<Operations[K]> {
-  if (!integrations.handypay()) {
-    throw new BillingUnavailableError("not_configured", "Billing isn't configured on this deployment yet.");
+// ---------------------------------------------------------------------------
+// Mapping (pure; unit-tested)
+// ---------------------------------------------------------------------------
+
+type RawSubscription = {
+  id?: string;
+  status?: string;
+  customer?: string | { id?: string } | null;
+  trial_end?: number | string | null;
+  current_period_start?: number | string | null;
+  current_period_end?: number | string | null;
+  cancel_at_period_end?: boolean | null;
+  cancel_at?: number | string | null;
+  canceled_at?: number | string | null;
+  metadata?: Record<string, unknown> | null;
+  items?: { data?: { current_period_start?: number; current_period_end?: number; price?: { unit_amount?: number | null } | null; plan?: { amount?: number | null } | null }[] } | null;
+  plan?: { amount?: number | null } | null;
+  amount_cents?: number | null;
+};
+
+export function toDate(value: number | string | null | undefined): Date | null {
+  if (value === null || value === undefined || value === "") return null;
+  const d = typeof value === "number" ? new Date(value * 1000) : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function mapStatus(status: string | undefined): ProviderSubscriptionStatus {
+  switch (status) {
+    case "trialing":
+    case "active":
+    case "past_due":
+    case "canceled":
+    case "incomplete":
+      return status;
+    case "incomplete_expired":
+    case "unpaid":
+      return "expired";
+    case "paused":
+      return "incomplete";
+    default:
+      return "incomplete";
   }
-  const fn = operations[op];
-  if (!fn) {
-    throw new BillingUnavailableError("operation_not_mapped", "Billing isn't available yet. Postory's HandyPay connection is still being set up.");
+}
+
+/** Plan from our own metadata first, then from the recurring amount. */
+export function planFromSubscription(raw: RawSubscription, fallback: PlanId | null = null): PlanId | null {
+  const tagged = raw.metadata?.postory_plan;
+  if (isPlanId(tagged)) return tagged;
+  const cents = raw.items?.data?.[0]?.price?.unit_amount ?? raw.items?.data?.[0]?.plan?.amount ?? raw.plan?.amount ?? raw.amount_cents ?? null;
+  if (typeof cents === "number") {
+    const match = (Object.keys(PLANS) as PlanId[]).find((id) => PLANS[id].priceMonthlyUsd * 100 === cents);
+    if (match) return match;
   }
-  return fn as NonNullable<Operations[K]>;
+  return fallback;
+}
+
+export function mapSubscription(raw: RawSubscription, fallbackPlan: PlanId | null = null): ProviderSubscription {
+  if (!raw.id) throw new BillingUnavailableError("provider_error", "HandyPay returned a subscription without an id.");
+  const item = raw.items?.data?.[0];
+  const customer = typeof raw.customer === "string" ? raw.customer : raw.customer?.id ?? null;
+  return {
+    reference: raw.id,
+    customerReference: customer,
+    plan: planFromSubscription(raw, fallbackPlan),
+    status: mapStatus(raw.status),
+    trialEndsAt: toDate(raw.trial_end),
+    // Newer Stripe API versions report the period on the subscription item.
+    currentPeriodStart: toDate(raw.current_period_start ?? item?.current_period_start),
+    currentPeriodEnd: toDate(raw.current_period_end ?? item?.current_period_end),
+    cancelAtPeriodEnd: Boolean(raw.cancel_at_period_end) || Boolean(raw.cancel_at),
+    canceledAt: toDate(raw.canceled_at),
+  };
+}
+
+type RawSession = {
+  id?: string;
+  session_id?: string;
+  url?: string;
+  checkout_url?: string;
+  status?: string;
+  payment_status?: string;
+  subscription?: string | { id?: string } | null;
+  customer?: string | { id?: string } | null;
+};
+
+export function mapCheckoutOutcome(raw: RawSession): CheckoutOutcome {
+  const status = raw.status ?? "";
+  if (status === "expired") return { state: "expired" };
+  const complete = ["complete", "completed", "paid", "succeeded"].includes(status);
+  // Delayed payment methods can complete without paying; only count settled or trial sessions.
+  if (!complete || raw.payment_status === "unpaid") return { state: "open" };
+  const subscription = typeof raw.subscription === "string" ? raw.subscription : raw.subscription?.id;
+  if (!subscription) return { state: "open" };
+  const customer = typeof raw.customer === "string" ? raw.customer : raw.customer?.id ?? null;
+  return { state: "complete", subscriptionReference: subscription, customerReference: customer };
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+async function createCheckout(input: CheckoutInput): Promise<CheckoutSession> {
+  const plan = PLANS[input.plan];
+  const body: Record<string, unknown> = {
+    amount_cents: plan.priceMonthlyUsd * 100,
+    currency: "USD",
+    interval: "month",
+    interval_count: 1,
+    name: `Postory ${plan.name}`,
+    quantity: 1,
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    metadata: { postory_user_id: input.userId, postory_event_id: input.clientReference, postory_plan: input.plan },
+  };
+  if (input.customerReference) body.customer_id = input.customerReference;
+  else if (input.customerEmail) body.customer_email = input.customerEmail;
+  if (input.trialDays > 0) body.trial_period_days = input.trialDays;
+
+  // Keyed on our checkout record so a double submit returns the same session.
+  const res = await request<RawSession>("POST", "/v1/subscription-sessions", body, `postory-checkout-${input.clientReference}`);
+  const reference = res.session_id ?? res.id;
+  const url = res.url ?? res.checkout_url;
+  if (!reference || !url) throw new BillingUnavailableError("provider_error", "HandyPay didn't return a checkout link.");
+  return { reference, url };
+}
+
+async function getCheckoutOutcome(sessionReference: string): Promise<CheckoutOutcome> {
+  return mapCheckoutOutcome(await request<RawSession>("GET", `/v1/payment-sessions/${encodeURIComponent(sessionReference)}`));
+}
+
+async function getSubscription(reference: string, fallbackPlan: PlanId | null = null): Promise<ProviderSubscription> {
+  return mapSubscription(await request<RawSubscription>("GET", `/v1/subscriptions/${encodeURIComponent(reference)}`), fallbackPlan);
+}
+
+async function cancelSubscription(reference: string, options: { atPeriodEnd: boolean }) {
+  await request("POST", `/v1/subscriptions/${encodeURIComponent(reference)}/cancel`, { at_period_end: options.atPeriodEnd });
+}
+
+async function resumeSubscription(reference: string) {
+  await request("POST", `/v1/subscriptions/${encodeURIComponent(reference)}/resume`, {});
+}
+
+async function createPortalSession(reference: string, returnUrl: string) {
+  const res = await request<{ url?: string }>("POST", `/v1/subscriptions/${encodeURIComponent(reference)}/portal-session`, { return_url: returnUrl });
+  if (!res.url) throw new BillingUnavailableError("provider_error", "HandyPay didn't return a management link.");
+  return res.url;
 }
 
 export const handypay = {
   isConfigured: () => integrations.handypay(),
-  supports: (op: BillingOperation) => integrations.handypay() && Boolean(operations[op]),
-  /** Can a customer actually start and complete a checkout right now? */
-  canCheckout: () =>
-    integrations.handypay() && Boolean(operations.createCheckout && operations.getCheckoutResult && operations.getSubscription),
-
-  createCheckout: (input: CheckoutInput) => require("createCheckout")(input),
-  getCheckoutResult: (reference: string) => require("getCheckoutResult")(reference),
-  getSubscription: (reference: string) => require("getSubscription")(reference),
-  changePlan: (reference: string, plan: PlanId) => require("changePlan")(reference, plan),
-  cancelSubscription: (reference: string) => require("cancelSubscription")(reference),
-  getManagementUrl: (reference: string) => require("getManagementUrl")(reference),
+  createCheckout,
+  getCheckoutOutcome,
+  getSubscription,
+  cancelSubscription,
+  resumeSubscription,
+  createPortalSession,
 };
