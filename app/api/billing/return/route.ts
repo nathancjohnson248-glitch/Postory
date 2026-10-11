@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { getSessionUser } from "@/lib/auth/session";
 import { reconcileCheckout } from "@/lib/billing/service";
 import { sendEmail } from "@/lib/email/send";
@@ -13,9 +14,7 @@ import { idSchema } from "@/lib/validation/schemas";
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const next = url.searchParams.get("next") === "/onboarding" ? "/onboarding" : "/app/billing";
-  const target = url.clone();
-  target.pathname = next;
-  target.search = "";
+  const target = publicUrl(request, next);
 
   const user = await getSessionUser();
   if (!user) {

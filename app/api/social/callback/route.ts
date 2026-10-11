@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { getSessionUser } from "@/lib/auth/session";
 import { UserFacingError } from "@/lib/errors";
 import { log } from "@/lib/log";
@@ -14,9 +15,7 @@ import { idSchema } from "@/lib/validation/schemas";
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const next = url.searchParams.get("next") === "/onboarding" ? "/onboarding" : "/app/settings";
-  const target = url.clone();
-  target.pathname = next;
-  target.search = "";
+  const target = publicUrl(request, next);
 
   const user = await getSessionUser();
   if (!user) {

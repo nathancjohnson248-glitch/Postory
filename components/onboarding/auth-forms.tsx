@@ -34,15 +34,19 @@ function ErrorNotice({ state }: { state: AuthFormState }) {
   return <Notice tone="danger" title={state.error} className="mb-5" />;
 }
 
-export function LoginForm({ next, initialError }: { next: string; initialError?: string }) {
+export function LoginForm({ next, initialError, google }: { next: string; initialError?: string; google: boolean }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signIn, initialError ? { error: initialError } : undefined);
   return (
     <>
-      <form action={signInWithGoogle}>
-        <input type="hidden" name="next" value={next} />
-        <GoogleSubmit label="Continue with Google" />
-      </form>
-      <Divider />
+      {google ? (
+        <>
+          <form action={signInWithGoogle}>
+            <input type="hidden" name="next" value={next} />
+            <GoogleSubmit label="Continue with Google" />
+          </form>
+          <Divider />
+        </>
+      ) : null}
       <ErrorNotice state={state} />
       <form action={action} className="flex flex-col gap-4" noValidate>
         <input type="hidden" name="next" value={next} />
@@ -68,7 +72,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
   );
 }
 
-export function SignupForm() {
+export function SignupForm({ google }: { google: boolean }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signUp, undefined);
   if (state?.notice) {
     return (
@@ -83,11 +87,15 @@ export function SignupForm() {
   }
   return (
     <>
-      <form action={signInWithGoogle}>
-        <input type="hidden" name="next" value="/onboarding" />
-        <GoogleSubmit label="Sign up with Google" />
-      </form>
-      <Divider />
+      {google ? (
+        <>
+          <form action={signInWithGoogle}>
+            <input type="hidden" name="next" value="/onboarding" />
+            <GoogleSubmit label="Sign up with Google" />
+          </form>
+          <Divider />
+        </>
+      ) : null}
       <ErrorNotice state={state} />
       <form action={action} className="flex flex-col gap-4" noValidate>
         <Field label="Your name" htmlFor="name">

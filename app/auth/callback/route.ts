@@ -1,5 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { redirectTo } from "@/lib/http/public-url";
 import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import { safeNextPath } from "@/lib/validation/schemas";
@@ -10,11 +11,17 @@ import { safeNextPath } from "@/lib/validation/schemas";
  * workspace and onboarding from the database, so no query flag is trusted.
  */
 export async function GET(request: NextRequest) {
-  const url = request.nextUrl;
-  const next = safeNextPath.parse(url.searchParams.get("next") ?? "/app");
-  const code = url.searchParams.get("code");
-  const tokenHash = url.searchParams.get("token_hash");
-  const type = url.searchParams.get("type") as EmailOtpType | null;
+  const params = request.nextUrl.searchParams;
+  const next = safeNextPath.parse(params.get("next") ?? "/app");
+  const code = params.get("code");
+  const tokenHash = params.get("token_hash");
+  const type = params.get("type") as EmailOtpType | null;
+
+  // Provider-side failure (e.g. the user cancelled Google consent).
+  if (params.get("error")) {
+    log.warn("auth provider returned an error", { operation: "auth.callback", error: params.get("error_description") ?? params.get("error") });
+    return redirectTo(request, "/login", { error: "provider" });
+  }
 
   const supabase = await createClient();
   let failed = false;
@@ -35,13 +42,6 @@ export async function GET(request: NextRequest) {
     failed = true;
   }
 
-  const target = url.clone();
-  target.search = "";
-  if (failed) {
-    target.pathname = "/login";
-    target.searchParams.set("error", url.searchParams.get("error_description") ? "provider" : "link");
-  } else {
-    target.pathname = type === "recovery" ? "/reset-password" : next;
-  }
-  return NextResponse.redirect(target);
+  if (failed) return redirectTo(request, "/login", { error: "link" });
+  return redirectTo(request, type === "recovery" ? "/reset-password" : next);
 }
