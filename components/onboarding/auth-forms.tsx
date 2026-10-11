@@ -1,13 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { MailCheck } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { requestPasswordReset, signIn, signInWithGoogle, signUp, updatePassword, type AuthFormState } from "@/app/(auth)/actions";
+import {
+  requestPasswordReset,
+  resendResetCode,
+  resendVerificationCode,
+  resetPassword,
+  signIn,
+  signInWithGoogle,
+  signUp,
+  verifySignupCode,
+  type AuthFormState,
+} from "@/app/(auth)/actions";
+import { CodeInput } from "./code-input";
 import { GoogleSubmit } from "./google-button";
 
 function Submit({ children }: { children: React.ReactNode }) {
@@ -74,17 +85,6 @@ export function LoginForm({ next, initialError, google }: { next: string; initia
 
 export function SignupForm({ google }: { google: boolean }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signUp, undefined);
-  if (state?.notice) {
-    return (
-      <div className="flex flex-col items-start gap-4">
-        <span className="grid size-12 place-items-center rounded-2xl bg-blue-50 text-blue-600">
-          <MailCheck className="size-6" aria-hidden />
-        </span>
-        <h2 className="text-xl font-semibold tracking-[-0.02em]">Check your email</h2>
-        <p className="text-[15px] leading-relaxed text-muted">{state.notice}</p>
-      </div>
-    );
-  }
   return (
     <>
       {google ? (
@@ -113,29 +113,104 @@ export function SignupForm({ google }: { google: boolean }) {
   );
 }
 
+/** Counts down before another code may be requested. Remount (key) to restart. */
+function ResendButton({ seconds, pending }: { seconds: number; pending: boolean }) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => {
+    if (left <= 0) return;
+    const timer = setTimeout(() => setLeft((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [left]);
+  const waiting = left > 0;
+  return (
+    <button
+      type="submit"
+      disabled={waiting || pending}
+      className="text-sm font-medium text-ink underline-offset-4 transition-colors hover:underline disabled:cursor-default disabled:text-faint disabled:no-underline"
+    >
+      {pending ? "Sending…" : waiting ? `Send a new code in ${left}s` : "Send a new code"}
+    </button>
+  );
+}
+
+function ResendCode({ action: resend, initialWait }: { action: () => Promise<AuthFormState>; initialWait: number }) {
+  const [state, action, pending] = useActionState<AuthFormState>(resend, undefined);
+  const wait = state?.retryAfter ?? (state ? 0 : initialWait);
+  return (
+    <div className="flex flex-col gap-3">
+      <AnimatePresence initial={false} mode="wait">
+        {state?.notice || state?.error ? (
+          <motion.p
+            key={state.attempt}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className={state.error ? "text-sm text-danger" : "text-sm text-success"}
+            role="status"
+          >
+            {state.notice ?? state.error}
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
+      <form action={action}>
+        <ResendButton key={state?.attempt ?? 0} seconds={wait} pending={pending} />
+      </form>
+    </div>
+  );
+}
+
+export function VerifyEmailForm({ codeLength }: { codeLength: number }) {
+  const [state, action, pending] = useActionState<AuthFormState, FormData>(verifySignupCode, undefined);
+  return (
+    <div className="flex flex-col gap-6">
+      <form action={action} className="flex flex-col gap-4" noValidate>
+        <CodeInput key={state?.attempt ?? 0} length={codeLength} invalid={Boolean(state?.error)} disabled={pending} />
+        <AnimatePresence initial={false}>
+          {state?.error ? (
+            <motion.p key={state.attempt} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="text-sm text-danger" role="alert">
+              {state.error}
+            </motion.p>
+          ) : null}
+        </AnimatePresence>
+        <Submit>Confirm email</Submit>
+      </form>
+      <ResendCode action={resendVerificationCode} initialWait={45} />
+    </div>
+  );
+}
+
 export function ForgotPasswordForm() {
   const [state, action] = useActionState<AuthFormState, FormData>(requestPasswordReset, undefined);
-  if (state?.notice) return <Notice tone="success" title="Check your email">{state.notice}</Notice>;
   return (
     <form action={action} className="flex flex-col gap-4" noValidate>
       <ErrorNotice state={state} />
       <Field label="Email" htmlFor="email">
-        <Input id="email" name="email" type="email" autoComplete="email" required />
+        <Input id="email" name="email" type="email" autoComplete="email" required defaultValue={state?.email} />
       </Field>
-      <Submit>Send reset link</Submit>
+      <Submit>Email me a code</Submit>
     </form>
   );
 }
 
-export function ResetPasswordForm() {
-  const [state, action] = useActionState<AuthFormState, FormData>(updatePassword, undefined);
+export function ResetPasswordForm({ codeLength = null }: { codeLength?: number | null }) {
+  const [state, action, pending] = useActionState<AuthFormState, FormData>(resetPassword, undefined);
+  const needsCode = codeLength !== null;
   return (
-    <form action={action} className="flex flex-col gap-4" noValidate>
-      <ErrorNotice state={state} />
-      <Field label="New password" htmlFor="password" hint="At least 8 characters.">
-        <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
-      </Field>
-      <Submit>Update password</Submit>
-    </form>
+    <div className="flex flex-col gap-6">
+      <form action={action} className="flex flex-col gap-5" noValidate>
+        <ErrorNotice state={state} />
+        {needsCode ? (
+          <div className="flex flex-col gap-2">
+            <span className="text-[13px] font-medium text-ink-soft">Code from the email</span>
+            <CodeInput key={state?.attempt ?? 0} length={codeLength} invalid={Boolean(state?.attempt)} disabled={pending} autoSubmit={false} />
+          </div>
+        ) : null}
+        <Field label="New password" htmlFor="password" hint="At least 8 characters.">
+          <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
+        </Field>
+        <Submit>Save new password</Submit>
+      </form>
+      {needsCode ? <ResendCode action={resendResetCode} initialWait={45} /> : null}
+    </div>
   );
 }

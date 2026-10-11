@@ -1,0 +1,16 @@
+<!--
+  Supabase → Authentication → Emails → "Confirm signup"
+  Subject: {{ .Token }} is your Postory code
+  Only used when Postory isn't sending its own auth email (no RESEND_API_KEY).
+  Code only — there is deliberately no confirmation link.
+-->
+<div style="margin:0;background:#fafaf8;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0c0c0e">
+  <div style="max-width:520px;margin:0 auto;padding:40px 24px">
+    <p style="margin:0 0 28px;font-weight:700;font-size:18px;letter-spacing:-0.03em"><span style="color:#2f5bff">↗</span> Postory</p>
+    <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;letter-spacing:-0.02em">Confirm your email</h1>
+    <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:#26262b">Enter this code on the sign-up page to finish creating your Postory account.</p>
+    <p style="margin:24px 0;padding:18px 20px;border-radius:14px;background:#f3f3f0;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:34px;font-weight:600;letter-spacing:0.22em;color:#0c0c0e">{{ .Token }}</p>
+    <p style="margin:0;font-size:13px;color:#66666e">It expires in an hour. If you didn't sign up for Postory, ignore this email — no account is created without the code.</p>
+    <p style="margin:40px 0 0;font-size:12px;color:#9c9ca4">Postory · postory.lol</p>
+  </div>
+</div>

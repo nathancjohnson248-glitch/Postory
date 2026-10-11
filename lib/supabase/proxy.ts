@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
 const PROTECTED_PREFIXES = ["/app", "/onboarding"];
-const AUTH_PAGES = ["/login", "/signup"];
+const AUTH_PAGES = ["/login", "/signup", "/verify"];
 
 function isProtected(pathname: string) {
   return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));

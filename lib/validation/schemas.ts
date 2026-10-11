@@ -9,6 +9,12 @@ const trimmed = (max: number) => z.string().trim().max(max);
 export const emailSchema = z.email("Enter a valid email address.").trim().toLowerCase().max(254);
 export const passwordSchema = z.string().min(8, "Use at least 8 characters.").max(128);
 
+/** One-time email codes are 6–10 digits depending on the Auth project setting. */
+export const emailCodeSchema = z
+  .string()
+  .transform((v) => v.replace(/\s+/g, ""))
+  .pipe(z.string().regex(/^\d{6,10}$/, "Enter the code from the email."));
+
 export const SignInSchema = z.object({ email: emailSchema, password: z.string().min(1, "Enter your password.").max(128) });
 export const SignUpSchema = z.object({
   name: trimmed(80).min(1, "Tell us your name."),

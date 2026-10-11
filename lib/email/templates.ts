@@ -19,7 +19,30 @@ function layout(title: string, body: string, cta?: { label: string; href: string
 
 const p = (text: string) => `<p style="margin:0 0 12px">${escape(text)}</p>`;
 
+const codeBlock = (code: string) =>
+  `<p style="margin:24px 0;padding:18px 20px;border-radius:14px;background:#f3f3f0;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:34px;font-weight:600;letter-spacing:0.22em;color:#0c0c0e">${escape(code)}</p>`;
+
 export const templates = {
+  signupCode: (input: { code: string }) => ({
+    subject: `${input.code} is your Postory code`,
+    text: `Your Postory confirmation code is ${input.code}. Enter it on the sign-up page to confirm your email. It expires in an hour. If you didn't sign up for Postory, you can ignore this email.`,
+    html: layout(
+      "Confirm your email",
+      p("Enter this code on the sign-up page to finish creating your Postory account.") +
+        codeBlock(input.code) +
+        `<p style="margin:0;font-size:13px;color:#66666e">It expires in an hour. If you didn't sign up for Postory, ignore this email — no account is created without the code.</p>`,
+    ),
+  }),
+  resetCode: (input: { code: string }) => ({
+    subject: `${input.code} is your Postory reset code`,
+    text: `Your Postory password reset code is ${input.code}. It expires in an hour. If you didn't ask to reset your password, you can ignore this email.`,
+    html: layout(
+      "Reset your password",
+      p("Enter this code on the reset page, then choose a new password.") +
+        codeBlock(input.code) +
+        `<p style="margin:0;font-size:13px;color:#66666e">It expires in an hour. If you didn't ask to reset your password, ignore this email — your password stays the same.</p>`,
+    ),
+  }),
   welcome: (input: { name: string | null }) => ({
     subject: "Welcome to Postory",
     text: `Hi${input.name ? ` ${input.name}` : ""}, your workspace is ready. Tell Postory what happened in your business and it will draft posts for every network, ready for your review: ${site.url}/app/create`,

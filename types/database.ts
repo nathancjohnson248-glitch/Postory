@@ -65,6 +65,30 @@ export type Database = {
           },
         ]
       }
+      auth_email_sends: {
+        Row: {
+          created_at: string
+          email_hash: string
+          id: number
+          ip_hash: string | null
+          purpose: string
+        }
+        Insert: {
+          created_at?: string
+          email_hash: string
+          id?: never
+          ip_hash?: string | null
+          purpose: string
+        }
+        Update: {
+          created_at?: string
+          email_hash?: string
+          id?: never
+          ip_hash?: string | null
+          purpose?: string
+        }
+        Relationships: []
+      }
       billing_events: {
         Row: {
           created_at: string
@@ -594,6 +618,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      auth_email_status: {
+        Args: { p_email: string }
+        Returns: {
+          confirmed: boolean
+          user_id: string
+        }[]
+      }
+      claim_auth_email_send: {
+        Args: { p_email_hash: string; p_ip_hash: string | null; p_purpose: string }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
+        }[]
+      }
       consume_usage: {
         Args: {
           p_limit: number
