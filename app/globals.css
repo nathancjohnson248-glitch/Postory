@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+/*
+ * Postory design tokens.
+ * Restrained palette: paper, ink, greys and one signature blue.
+ */
+@theme {
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-instrument-serif), ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-paper: #fafaf8;
+  --color-surface: #ffffff;
+  --color-ink: #0c0c0e;
+  --color-ink-soft: #26262b;
+  --color-muted: #66666e;
+  --color-faint: #9c9ca4;
+  --color-line: #ecebe7;
+  --color-line-strong: #dddcd6;
+  --color-wash: #f3f3f0;
+
+  --color-blue-50: #eef3ff;
+  --color-blue-100: #dde7ff;
+  --color-blue-200: #bfd0ff;
+  --color-blue-300: #93b0ff;
+  --color-blue-400: #5f87ff;
+  --color-blue-500: #2f5bff;
+  --color-blue-600: #2048e6;
+  --color-blue-700: #1b3bb8;
+  --color-blue-800: #183290;
+  --color-blue-900: #152a6b;
+
+  --color-success: #11795a;
+  --color-success-wash: #e7f5ef;
+  --color-warning: #9a5a06;
+  --color-warning-wash: #fdf2df;
+  --color-danger: #c0332e;
+  --color-danger-wash: #fdeceb;
+
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 26px;
+
+  --shadow-hairline: 0 0 0 1px rgb(12 12 14 / 0.06);
+  --shadow-soft: 0 1px 2px rgb(12 12 14 / 0.04), 0 10px 30px -14px rgb(12 12 14 / 0.12);
+  --shadow-lift: 0 1px 2px rgb(12 12 14 / 0.05), 0 30px 60px -28px rgb(12 12 14 / 0.25);
+  --shadow-float: 0 2px 6px rgb(12 12 14 / 0.05), 0 40px 90px -30px rgb(18 32 90 / 0.28);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-fade-up: fade-up 0.5s var(--ease-out-soft) both;
+
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  ::selection {
+    background: var(--color-blue-100);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue-500);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  dialog::backdrop {
+    background: rgb(12 12 14 / 0.32);
+    backdrop-filter: blur(3px);
+  }
+}
+
+@layer components {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--color-wash) 0px, #ebebe7 120px, var(--color-wash) 240px);
+    background-size: 800px 100%;
+    animation: var(--animate-shimmer);
+    border-radius: 10px;
+  }
+
+  .hairline-grid {
+    background-image:
+      linear-gradient(to right, rgb(12 12 14 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(12 12 14 / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
