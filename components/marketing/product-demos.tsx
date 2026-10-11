@@ -24,7 +24,7 @@ function DemoTag({ className }: { className?: string }) {
 /** Hero centerpiece: the Create → Review surface, built from real Postory components. */
 export function HeroProduct() {
   const reduce = useReducedMotion();
-  const posts = demoPosts.slice(0, 3);
+  const posts = demoPosts.filter((p) => p.platform !== "instagram").slice(0, 3);
   return (
     <div className="relative">
       <div className="absolute -inset-x-10 -bottom-10 -top-6 -z-10 rounded-[48px] bg-gradient-to-b from-blue-50/70 to-transparent" aria-hidden />
@@ -103,7 +103,13 @@ export function PlatformVersions() {
             </span>
             <DemoTag />
           </div>
-          <PostPreview platform={post.platform} content={post.content} authorName={demoBusiness.name} handle={demoBusiness.handle} />
+          <PostPreview
+            platform={post.platform}
+            content={post.content}
+            authorName={demoBusiness.name}
+            handle={demoBusiness.handle}
+            media={post.image ? [{ kind: "image", url: post.image, alt: "Example launch graphic" }] : []}
+          />
         </div>
       ))}
     </div>

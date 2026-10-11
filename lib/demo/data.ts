@@ -20,7 +20,7 @@ export const demoStory = {
   angles: ["First-hour milestone", "Behind the launch", "What's next for early users"],
 };
 
-export type DemoPost = { platform: Platform; status: PostStatus; when: string; content: string };
+export type DemoPost = { platform: Platform; status: PostStatus; when: string; content: string; image?: string };
 
 export const demoPosts: DemoPost[] = [
   {
@@ -41,6 +41,7 @@ export const demoPosts: DemoPost[] = [
     status: "awaiting_review",
     when: "Needs review",
     content: "WE'RE LIVE ON IOS.\n\n37 downloads in the first hour.\n\nThis is just the beginning.",
+    image: "/demo/fernwood-launch.svg",
   },
   {
     platform: "threads",

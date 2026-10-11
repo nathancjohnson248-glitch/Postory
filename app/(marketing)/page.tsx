@@ -25,20 +25,20 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="hairline-grid absolute inset-0 -z-10 opacity-50 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" aria-hidden />
-        <div className="mx-auto max-w-7xl px-5 pb-20 pt-16 sm:px-8 sm:pt-24">
+        <div className="mx-auto max-w-7xl px-5 pb-20 pt-12 sm:px-8 sm:pt-16">
           <Reveal className="mx-auto max-w-5xl text-center">
             <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-ink-soft shadow-soft ring-1 ring-line">
               <span className="size-1.5 rounded-full bg-blue-500" aria-hidden />
               Social publishing for businesses that ship
             </p>
-            <h1 className="mt-8 font-display text-[58px] leading-[0.92] tracking-[-0.03em] text-balance sm:text-[96px] lg:text-[124px]">
+            <h1 className="mt-7 font-display text-[54px] leading-[0.92] tracking-[-0.03em] text-balance sm:text-[88px] lg:text-[108px]">
               Your business doesn&apos;t stop.
               <span className="block italic text-blue-600">Neither should your social.</span>
             </h1>
-            <p className="mx-auto mt-8 max-w-2xl text-[18px] leading-relaxed text-muted text-pretty sm:text-[20px]">
+            <p className="mx-auto mt-7 max-w-2xl text-[18px] leading-relaxed text-muted text-pretty sm:text-[20px]">
               Tell Postory what happened. It turns the moment into platform-native posts, waits for your approval, and keeps every network moving.
             </p>
-            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
               <Link href="/signup" className={buttonClasses({ size: "lg", variant: "accent", className: "h-13 px-6 text-[16px]" })}>
                 Start 3-day trial <ArrowRight className="size-4" aria-hidden />
               </Link>
@@ -47,11 +47,9 @@ export default function HomePage() {
               </Link>
             </div>
           </Reveal>
-          <Reveal delay={0.15} className="mx-auto mt-16 max-w-6xl" >
-            <div id="product" className="scroll-mt-24">
-              <HeroProduct />
-            </div>
-          </Reveal>
+          <div id="product" className="mx-auto mt-14 max-w-6xl scroll-mt-24">
+            <HeroProduct />
+          </div>
         </div>
       </section>
 

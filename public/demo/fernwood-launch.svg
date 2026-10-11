@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Example launch graphic: Fernwood is live on iOS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b3bb8"/>
+      <stop offset="1" stop-color="#2f5bff"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <g opacity="0.12" stroke="#fff">
+    <path d="M0 250H800M0 500H800M0 750H800M200 0V1000M400 0V1000M600 0V1000"/>
+  </g>
+  <rect x="250" y="210" width="300" height="600" rx="54" fill="#0c0c0e"/>
+  <rect x="266" y="226" width="268" height="568" rx="40" fill="#fafaf8"/>
+  <rect x="356" y="244" width="88" height="22" rx="11" fill="#0c0c0e"/>
+  <rect x="296" y="320" width="208" height="40" rx="12" fill="#dde7ff"/>
+  <rect x="296" y="380" width="160" height="16" rx="8" fill="#ecebe7"/>
+  <rect x="296" y="412" width="190" height="16" rx="8" fill="#ecebe7"/>
+  <g fill="#2f5bff"><circle cx="316" cy="480" r="14"/><circle cx="316" cy="530" r="14"/><circle cx="316" cy="580" r="14" fill-opacity="0.25"/></g>
+  <g fill="#ecebe7"><rect x="344" y="472" width="150" height="16" rx="8"/><rect x="344" y="522" width="120" height="16" rx="8"/><rect x="344" y="572" width="140" height="16" rx="8"/></g>
+  <text x="400" y="120" text-anchor="middle" font-family="Georgia, serif" font-size="64" font-style="italic" fill="#fff">Live on iOS</text>
+  <text x="400" y="900" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#fff" fill-opacity="0.85">fernwood · example</text>
+</svg>
