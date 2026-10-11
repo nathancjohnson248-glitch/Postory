@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { VerifyEmailForm } from "@/components/onboarding/auth-forms";
+import { authEmailMode } from "@/lib/auth/email-codes";
 import { getPendingEmail } from "@/lib/auth/pending";
 
 export const metadata: Metadata = { title: "Confirm your email" };
@@ -9,6 +10,8 @@ export const metadata: Metadata = { title: "Confirm your email" };
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
   const [pending, { reason }] = await Promise.all([getPendingEmail("verify"), searchParams]);
   if (!pending) redirect("/signup");
+  // Without an email sender there are no codes; accounts are confirmed on creation.
+  if (authEmailMode() === "instant") redirect("/login");
 
   return (
     <>

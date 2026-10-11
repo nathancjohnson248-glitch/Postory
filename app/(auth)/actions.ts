@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { postorySendsAuthEmail, resendSignupCode, sendPasswordResetCode, startSignupWithCode } from "@/lib/auth/email-codes";
+import { authEmailMode, confirmWithoutEmail, createConfirmedAccount, resendSignupCode, sendPasswordResetCode, startSignupWithCode } from "@/lib/auth/email-codes";
 import { requestOrigin } from "@/lib/auth/origin";
 import { clearPendingEmail, getPendingEmail, setPendingEmail } from "@/lib/auth/pending";
 import { log } from "@/lib/log";
@@ -71,8 +71,18 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
     // this can't be used to probe for accounts. Send a fresh code and go to
     // the code screen.
     if (isUnconfirmed(error)) {
+      const mode = authEmailMode();
+      if (mode === "instant") {
+        // No email sender yet: the password checked out, so finish the
+        // sign-up that an earlier confirmation email never completed.
+        if (await confirmWithoutEmail(parsed.data.email)) {
+          const retry = await supabase.auth.signInWithPassword(parsed.data);
+          if (!retry.error) redirect(safeNextPath.parse(formData.get("next") ?? "/app"));
+        }
+        return { error: "Something went wrong signing you in. Try again.", email: parsed.data.email };
+      }
       let codeLength: number | undefined;
-      if (postorySendsAuthEmail()) {
+      if (mode === "codes") {
         const outcome = await resendSignupCode(parsed.data.email);
         if (outcome.status === "sent") codeLength = outcome.codeLength;
       } else {
@@ -101,8 +111,21 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
   if (!parsed.success) return { error: firstError(parsed.error), email: String(formData.get("email") ?? "") };
   const { email } = parsed.data;
 
+  const mode = authEmailMode();
+  if (mode === "instant") {
+    const outcome = await createConfirmedAccount(parsed.data);
+    if (outcome.status === "exists") return { error: EXISTS, email };
+    if (outcome.status === "invalid") return { error: outcome.message, email };
+    if (outcome.status === "throttled") return { error: "Too many sign-ups from this network just now. Try again in a little while.", email };
+    if (outcome.status === "failed") return { error: "We couldn't create your account. Try again in a minute.", email };
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password: parsed.data.password });
+    if (error) return { error: friendlyAuthError(error), email };
+    redirect("/onboarding");
+  }
+
   let codeLength: number | undefined;
-  if (postorySendsAuthEmail()) {
+  if (mode === "codes") {
     const outcome = await startSignupWithCode(parsed.data);
     switch (outcome.status) {
       case "sent":
@@ -162,7 +185,9 @@ async function resendVerificationCodeInner(): Promise<AuthFormState> {
   const pending = await getPendingEmail("verify");
   if (!pending) return { error: "This sign-up has timed out. Start again or log in." };
 
-  if (postorySendsAuthEmail()) {
+  const mode = authEmailMode();
+  if (mode === "instant") return { error: "No code is needed right now — log in with your email and password." };
+  if (mode === "codes") {
     const outcome = await resendSignupCode(pending.email);
     switch (outcome.status) {
       case "sent":
@@ -208,8 +233,13 @@ export async function signInWithGoogle(formData: FormData) {
 // Password reset: email → code + new password
 // ---------------------------------------------------------------------------
 
+const RESET_UNAVAILABLE = `Password reset by email is still being set up. Email ${site.founder.email} from your account's address and we'll reset it for you.`;
+
 async function sendResetCode(email: string): Promise<{ codeLength?: number; error?: string; retryAfter?: number }> {
-  if (postorySendsAuthEmail()) {
+  const mode = authEmailMode();
+  // Never fall back to Supabase's own mailer in production.
+  if (mode === "instant") return { error: RESET_UNAVAILABLE };
+  if (mode === "codes") {
     const outcome = await sendPasswordResetCode(email);
     if (outcome.status === "sent") return { codeLength: outcome.codeLength };
     if (outcome.status === "throttled") return { retryAfter: outcome.retryAfter };

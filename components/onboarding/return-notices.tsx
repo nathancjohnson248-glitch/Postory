@@ -35,6 +35,13 @@ export function CheckoutReturnNotice({ status }: { status: string }) {
       </Notice>
     );
   }
+  if (status === "expired") {
+    return (
+      <Notice tone="info" title="That checkout expired before it was completed." className="mx-auto mb-6 max-w-2xl">
+        Nothing was charged. Choose a plan to start a fresh checkout.
+      </Notice>
+    );
+  }
   if (status === "error") {
     return (
       <Notice tone="warning" title="We couldn't confirm your subscription with HandyPay." className="mx-auto mb-6 max-w-2xl">

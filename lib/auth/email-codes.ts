@@ -29,6 +29,22 @@ export function postorySendsAuthEmail() {
   return integrations.resend() && integrations.supabaseAdmin();
 }
 
+/**
+ * How sign-up and password reset reach people:
+ * - "codes": Postory emails a one-time code from its own address (Resend).
+ * - "instant": no sender is configured yet, so accounts are created already
+ *   confirmed and Supabase never emails anyone. Codes switch on by
+ *   themselves as soon as Resend is configured.
+ * - "supabase": local development without a service key.
+ */
+export type AuthEmailMode = "codes" | "instant" | "supabase";
+
+export function authEmailMode(): AuthEmailMode {
+  if (postorySendsAuthEmail()) return "codes";
+  if (integrations.supabaseAdmin()) return "instant";
+  return "supabase";
+}
+
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
 async function originHash() {
@@ -155,5 +171,63 @@ export async function sendPasswordResetCode(email: string): Promise<CodeOutcome>
   } catch (error) {
     log.error("reset code failed", { operation: "auth.codes.reset", provider: "supabase" }, error);
     return { status: "failed" };
+  }
+}
+
+export type CreateOutcome =
+  | { status: "created" }
+  | { status: "exists" }
+  | { status: "throttled"; retryAfter: number }
+  | { status: "invalid"; message: string }
+  | { status: "failed" };
+
+/** "instant" mode: create the account confirmed, with no email sent by anyone. */
+export async function createConfirmedAccount(input: { email: string; password: string; name: string }): Promise<CreateOutcome> {
+  try {
+    const existing = await accountStatus(input.email);
+    if (existing?.confirmed) return { status: "exists" };
+
+    // Same per-address and per-origin limits as code emails, against bulk sign-ups.
+    const claim = await claimSend(input.email, "signup");
+    if (!claim.ok) return { status: "throttled", retryAfter: claim.retryAfter };
+
+    const admin = createAdminClient();
+    if (existing) {
+      const { error } = await admin.auth.admin.deleteUser(existing.userId);
+      if (error) throw error;
+    }
+    const { error } = await admin.auth.admin.createUser({
+      email: input.email,
+      password: input.password,
+      email_confirm: true,
+      user_metadata: { full_name: input.name },
+    });
+    if (error) {
+      if (error.code === "email_exists" || error.code === "user_already_exists") return { status: "exists" };
+      if (error.code === "weak_password" || error.code === "validation_failed") return { status: "invalid", message: error.message };
+      throw error;
+    }
+    return { status: "created" };
+  } catch (error) {
+    log.error("account creation failed", { operation: "auth.instant.create", provider: "supabase" }, error);
+    return { status: "failed" };
+  }
+}
+
+/**
+ * "instant" mode: an account left unconfirmed by an earlier sign-up. Only
+ * called after Auth has accepted the password for it.
+ */
+export async function confirmWithoutEmail(email: string): Promise<boolean> {
+  try {
+    const existing = await accountStatus(email);
+    if (!existing) return false;
+    if (existing.confirmed) return true;
+    const { error } = await createAdminClient().auth.admin.updateUserById(existing.userId, { email_confirm: true });
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    log.error("confirm without email failed", { operation: "auth.instant.confirm", provider: "supabase" }, error);
+    return false;
   }
 }
