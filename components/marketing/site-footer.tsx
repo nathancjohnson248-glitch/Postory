@@ -41,9 +41,6 @@ export function SiteFooter() {
             <a href={site.founder.xUrl} target="_blank" rel="noreferrer noopener" className="hover:text-ink">
               X
             </a>
-            <a href={site.founder.githubUrl} target="_blank" rel="noreferrer noopener" className="hover:text-ink">
-              GitHub
-            </a>
             <a href={`mailto:${site.founder.email}`} className="hover:text-ink">
               Email
             </a>

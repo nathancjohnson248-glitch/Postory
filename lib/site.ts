@@ -7,7 +7,6 @@ export const site = {
     name: "Nathan",
     xUrl: process.env.NEXT_PUBLIC_FOUNDER_X_URL || "https://x.com/nathanjhsn",
     xHandle: "@nathanjhsn",
-    githubUrl: process.env.NEXT_PUBLIC_FOUNDER_GITHUB_URL || "https://github.com/nathancjohnson248-glitch",
     email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || "nathanjhsn@icloud.com",
   },
 } as const;
