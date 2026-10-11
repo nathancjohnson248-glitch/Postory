@@ -93,9 +93,7 @@ export function isPlatform(value: unknown): value is Platform {
 export function countCharacters(text: string): number {
   if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
     const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-    let count = 0;
-    for (const _ of segmenter.segment(text)) count += 1;
-    return count;
+    return Array.from(segmenter.segment(text)).length;
   }
   return Array.from(text).length;
 }

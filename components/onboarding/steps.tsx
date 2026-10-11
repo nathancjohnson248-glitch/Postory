@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,15 +44,17 @@ export function BusinessStep({
 }: {
   defaults: { businessName: string; businessDescription: string; businessType: string; websiteUrl: string };
 }) {
-  const [state, action] = useActionState<StepFormState, FormData>(saveBusiness, undefined);
-  const [timezone, setTimezone] = useState("UTC");
-  useEffect(() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"), []);
+  const [state, submit] = useActionState<StepFormState, FormData>(saveBusiness, undefined);
+  // The browser's timezone is read at submit time and saved to the profile.
+  const action = (formData: FormData) => {
+    formData.set("timezone", Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
+    return submit(formData);
+  };
   const e = state?.errors ?? {};
 
   return (
     <form action={action} className="flex flex-col gap-5" noValidate>
       {state?.error ? <Notice tone="danger" title={state.error} /> : null}
-      <input type="hidden" name="timezone" value={timezone} />
       <Field label="What's your business called?" htmlFor="businessName" error={e.businessName}>
         <Input id="businessName" name="businessName" defaultValue={defaults.businessName} placeholder="Fernwood" required autoFocus aria-invalid={Boolean(e.businessName) || undefined} />
       </Field>
