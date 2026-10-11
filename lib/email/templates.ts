@@ -10,7 +10,7 @@ function layout(title: string, body: string, cta?: { label: string; href: string
     : "";
   return `<!doctype html><html><body style="margin:0;background:#fafaf8;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#0c0c0e">
 <div style="max-width:520px;margin:0 auto;padding:40px 24px">
-<p style="margin:0 0 28px;font-weight:700;font-size:18px;letter-spacing:-0.03em"><span style="color:#2f5bff">↗</span> postory</p>
+<p style="margin:0 0 28px;font-weight:700;font-size:18px;letter-spacing:-0.03em"><span style="color:#2f5bff">↗</span> Postory</p>
 <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;letter-spacing:-0.02em">${escape(title)}</h1>
 <div style="font-size:15px;line-height:1.6;color:#26262b">${body}</div>${button}
 <p style="margin:40px 0 0;font-size:12px;color:#9c9ca4">${site.name} · ${site.domain}</p>

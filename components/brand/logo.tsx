@@ -55,8 +55,8 @@ export function Logo({ className, markClassName }: { className?: string; markCla
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
       <LogoMark className={cn("h-[26px] w-auto", markClassName)} />
-      <span className="text-[21px] font-semibold leading-none tracking-[-0.045em] text-ink" aria-hidden>
-        postory
+      <span className="text-[21px] font-semibold leading-none tracking-[-0.04em] text-ink" aria-hidden>
+        Postory
       </span>
       <span className="sr-only">Postory</span>
     </span>

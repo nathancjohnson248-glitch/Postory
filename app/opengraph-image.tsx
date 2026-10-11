@@ -19,7 +19,7 @@ export default function OpenGraphImage() {
             </g>
             <circle cx="8.5" cy="25" r="2.4" fill="#fff" />
           </svg>
-          <span style={{ fontSize: 40, fontWeight: 700, letterSpacing: -1.5 }}>postory</span>
+          <span style={{ fontSize: 40, fontWeight: 700, letterSpacing: -1.5 }}>Postory</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", fontSize: 84, lineHeight: 1, letterSpacing: -3, fontWeight: 600 }}>
           <span>Your business doesn&apos;t stop.</span>
