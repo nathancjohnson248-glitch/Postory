@@ -14,12 +14,15 @@ export function ColumnChart({
   unit,
   height = 180,
   highlightLast = true,
+  prefix = "",
 }: {
   data: { label: string; value: number }[];
   label: string;
   unit: string;
   height?: number;
   highlightLast?: boolean;
+  /** Shown before values, e.g. "$". */
+  prefix?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...data.map((d) => d.value));
@@ -32,10 +35,13 @@ export function ColumnChart({
         {/* Gridlines */}
         {ticks.map((t) => (
           <div key={t} className="absolute inset-x-8 border-t border-line" style={{ bottom: `${(t / top) * 100}%` }} aria-hidden>
-            <span className="absolute -left-8 -translate-y-1/2 text-[11px] tabular-nums text-faint">{t}</span>
+            <span className="absolute -left-8 -translate-y-1/2 text-[11px] tabular-nums text-faint">
+              {prefix}
+              {t.toLocaleString("en-US")}
+            </span>
           </div>
         ))}
-        <div className="absolute inset-y-0 left-8 right-0 flex items-end gap-0.5" role="img" aria-label={`${label}. ${data.map((d) => `${d.label}: ${d.value}`).join(", ")}`}>
+        <div className="absolute inset-y-0 left-8 right-0 flex items-end gap-0.5" role="img" aria-label={`${label}. ${data.map((d) => `${d.label}: ${prefix}${d.value}`).join(", ")}`}>
           {data.map((d, i) => {
             const isLast = highlightLast && i === data.length - 1;
             return (
@@ -47,7 +53,7 @@ export function ColumnChart({
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover(null)}
                 tabIndex={0}
-                aria-label={`${d.label}: ${d.value} ${unit}`}
+                aria-label={`${d.label}: ${prefix}${d.value} ${unit}`}
               >
                 <div
                   className={cn("w-full max-w-6 rounded-t-[4px] transition-colors", isLast ? "bg-blue-500" : "bg-blue-300", hover === i && "bg-blue-600")}
@@ -55,7 +61,11 @@ export function ColumnChart({
                 />
                 {hover === i ? (
                   <div className="pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded-lg bg-ink px-2.5 py-1.5 text-[12px] text-white shadow-lift">
-                    <span className="font-semibold tabular-nums">{d.value}</span> {unit}
+                    <span className="font-semibold tabular-nums">
+                      {prefix}
+                      {d.value.toLocaleString("en-US")}
+                    </span>{" "}
+                    {unit}
                     <span className="text-white/60"> · {d.label}</span>
                   </div>
                 ) : null}

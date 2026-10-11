@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/types/database";
 
-const PROTECTED_PREFIXES = ["/app", "/onboarding"];
+const PROTECTED_PREFIXES = ["/app", "/onboarding", "/start"];
 const AUTH_PAGES = ["/login", "/signup", "/verify"];
 
 function isProtected(pathname: string) {

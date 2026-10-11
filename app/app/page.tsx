@@ -7,18 +7,17 @@ import { QuickCreate } from "@/components/app/quick-create";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
-import { requireOnboardedUser } from "@/lib/auth/session";
-import { getEntitlements } from "@/lib/entitlements";
+import { requireAppAccess } from "@/lib/auth/access";
 import { getHomeData } from "@/lib/data/home";
 import { getNetworkStates } from "@/lib/data/social";
 import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { formatRelativeDay, greeting, safeTimeZone } from "@/lib/time";
 import { firstName, pluralize } from "@/lib/utils";
 
-export default async function HomePage() {
-  const { user, profile } = await requireOnboardedUser();
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
+  const { user, profile, entitlements, adminRole } = await requireAppAccess();
   const tz = safeTimeZone(profile.timezone);
-  const [data, networks, entitlements] = await Promise.all([getHomeData(user.id), getNetworkStates(user.id), getEntitlements(user.id)]);
+  const [data, networks, { welcome }] = await Promise.all([getHomeData(user.id), getNetworkStates(user.id), searchParams]);
   const name = firstName(profile.name);
   const connected = networks.flatMap((n) => n.accounts.map((a) => ({ ...a, platform: n.platform })));
 
@@ -46,14 +45,15 @@ export default async function HomePage() {
         }
       />
 
-      {!entitlements.active ? (
-        <Notice
-          tone="warning"
-          title={entitlements.reason === "trial_ended" ? "Your trial has ended." : "You don't have a plan yet."}
-          className="mb-6"
-          action={<ButtonLink href="/app/billing" size="sm" variant="secondary">See plans</ButtonLink>}
-        >
-          You can look around, but generating and publishing posts needs a plan. Your stories and posts are kept either way.
+      {welcome && entitlements.active ? (
+        <Notice tone="success" title={entitlements.trialing ? "Your trial has started. Welcome to Postory." : "You're all set. Welcome to Postory."} className="fade-rise mb-6">
+          Start with something that happened this week — a launch, a milestone, a customer win. Postory turns it into posts for your review.
+        </Notice>
+      ) : null}
+
+      {!entitlements.active && adminRole ? (
+        <Notice tone="info" title="You're browsing as Postory staff without a plan." className="mb-6">
+          Generating and publishing posts still needs a plan on this account.
         </Notice>
       ) : null}
 

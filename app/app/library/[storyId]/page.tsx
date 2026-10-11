@@ -12,7 +12,7 @@ import { Notice } from "@/components/ui/notice";
 import { aiAvailable } from "@/lib/ai/client";
 import { factCorpus, loadBusinessContext } from "@/lib/ai/context";
 import { findUnsupportedNumbers } from "@/lib/ai/factuality";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { reconcileQuietly } from "@/lib/data/home";
 import { getStory } from "@/lib/data/posts";
 import { getEntitlements } from "@/lib/entitlements";
@@ -32,7 +32,7 @@ type Analysis = { angles?: string[]; missingInformation?: string[]; schedulingSu
 export default async function StoryPage({ params }: { params: Promise<{ storyId: string }> }) {
   const { storyId } = await params;
   if (!idSchema.safeParse(storyId).success) notFound();
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   await reconcileQuietly(user.id);
 
   const supabase = await createClient();

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/app/section";
 import { CalendarBoard } from "@/components/app/calendar/calendar-board";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { reconcileQuietly } from "@/lib/data/home";
 import { listCalendarPosts, listPosts } from "@/lib/data/posts";
 import { addDaysToKey, dateKey, isMonthKey, monthGrid, safeTimeZone, zonedToUtc } from "@/lib/time";
@@ -9,7 +9,7 @@ import { addDaysToKey, dateKey, isMonthKey, monthGrid, safeTimeZone, zonedToUtc 
 export const metadata: Metadata = { title: "Calendar" };
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ month?: string; view?: string }> }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const params = await searchParams;
   const tz = safeTimeZone(profile.timezone);
   const today = dateKey(new Date(), tz);

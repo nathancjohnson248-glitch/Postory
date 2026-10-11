@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/app/section";
 import { CreateWorkspace } from "@/components/app/create/create-workspace";
 import type { GenerationAvailability } from "@/components/app/create/composer";
 import { aiAvailable } from "@/lib/ai/client";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { getEntitlements, getUsageSummary } from "@/lib/entitlements";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatform, type Platform } from "@/lib/social/platforms";
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Create" };
 export const maxDuration = 60;
 
 export default async function CreatePage({ searchParams }: { searchParams: Promise<{ text?: string }> }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const { text } = await searchParams;
   const supabase = await createClient();
   const [entitlements, { data: accounts }] = await Promise.all([

@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { aiAvailable } from "@/lib/ai/client";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { getEntitlements } from "@/lib/entitlements";
 import { createClient } from "@/lib/supabase/server";
 import type { Platform } from "@/lib/social/platforms";
@@ -24,7 +24,7 @@ const TABS = [
 ] as const;
 
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const { tab } = await searchParams;
   const entitlements = await getEntitlements(user.id);
   const tz = safeTimeZone(profile.timezone);

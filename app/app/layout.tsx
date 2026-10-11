@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/app/app-shell";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { PLANS } from "@/lib/billing/plans";
-import { getEntitlements } from "@/lib/entitlements";
 import { createClient } from "@/lib/supabase/server";
 import { formatInZone, safeTimeZone } from "@/lib/time";
 import type { Platform } from "@/lib/social/platforms";
@@ -10,10 +9,9 @@ import type { Platform } from "@/lib/social/platforms";
 export const metadata: Metadata = { title: { default: "Home", template: "%s · Postory" }, robots: { index: false } };
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile, entitlements, adminRole } = await requireAppAccess();
   const supabase = await createClient();
-  const [entitlements, { data: accounts }, { count: reviewCount }] = await Promise.all([
-    getEntitlements(user.id),
+  const [{ data: accounts }, { count: reviewCount }] = await Promise.all([
     supabase
       .from("social_accounts")
       .select("id,platform,display_name,username,status")
@@ -35,6 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         : entitlements.trialing && entitlements.trialEndsAt
           ? `${name} trial · ends ${formatInZone(entitlements.trialEndsAt, tz, { month: "short", day: "numeric" })}`
           : name;
+  } else if (adminRole) {
+    planLabel = adminRole === "owner" ? "Owner" : "Admin";
+    planTone = "ok";
   } else if (entitlements.reason === "trial_ended") {
     planLabel = "Trial ended";
   }
@@ -51,6 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       planLabel={planLabel}
       planTone={planTone}
       reviewCount={reviewCount ?? 0}
+      isAdmin={Boolean(adminRole)}
     >
       {children}
     </AppShell>

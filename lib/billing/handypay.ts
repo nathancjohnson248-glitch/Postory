@@ -140,9 +140,21 @@ type RawSubscription = {
   cancel_at?: number | string | null;
   canceled_at?: number | string | null;
   metadata?: Record<string, unknown> | null;
-  items?: { data?: { current_period_start?: number; current_period_end?: number; price?: { unit_amount?: number | null } | null; plan?: { amount?: number | null } | null }[] } | null;
-  plan?: { amount?: number | null } | null;
+  items?: {
+    data?: {
+      current_period_start?: number;
+      current_period_end?: number;
+      quantity?: number | null;
+      price?: { unit_amount?: number | null; recurring?: { interval?: string | null; interval_count?: number | null } | null } | null;
+      plan?: { amount?: number | null; interval?: string | null; interval_count?: number | null } | null;
+    }[];
+  } | null;
+  plan?: { amount?: number | null; interval?: string | null; interval_count?: number | null } | null;
   amount_cents?: number | null;
+  quantity?: number | null;
+  created?: number | string | null;
+  start_date?: number | string | null;
+  ended_at?: number | string | null;
 };
 
 export function toDate(value: number | string | null | undefined): Date | null {
@@ -196,6 +208,45 @@ export function mapSubscription(raw: RawSubscription, fallbackPlan: PlanId | nul
     currentPeriodEnd: toDate(raw.current_period_end ?? item?.current_period_end),
     cancelAtPeriodEnd: Boolean(raw.cancel_at_period_end) || Boolean(raw.cancel_at),
     canceledAt: toDate(raw.canceled_at),
+  };
+}
+
+/** A subscription as the admin area reports it: amounts and lifecycle dates. */
+export type AdminSubscription = ProviderSubscription & {
+  rawStatus: string;
+  userId: string | null;
+  amountCents: number | null;
+  monthlyCents: number | null;
+  interval: string;
+  intervalCount: number;
+  createdAt: Date | null;
+  endedAt: Date | null;
+  taggedForPostory: boolean;
+};
+
+const MONTHS_PER: Record<string, number> = { day: 12 / 365, week: 12 / 52, month: 1, year: 12 };
+
+export function mapAdminSubscription(raw: RawSubscription): AdminSubscription {
+  const base = mapSubscription(raw);
+  const item = raw.items?.data?.[0];
+  const unit = item?.price?.unit_amount ?? item?.plan?.amount ?? raw.plan?.amount ?? raw.amount_cents ?? null;
+  const quantity = item?.quantity ?? raw.quantity ?? 1;
+  const interval = item?.price?.recurring?.interval ?? item?.plan?.interval ?? raw.plan?.interval ?? "month";
+  const intervalCount = Math.max(1, item?.price?.recurring?.interval_count ?? item?.plan?.interval_count ?? raw.plan?.interval_count ?? 1);
+  const amountCents = typeof unit === "number" ? unit * (quantity ?? 1) : null;
+  const monthsPerInterval = (MONTHS_PER[interval] ?? 1) * intervalCount;
+  const userId = typeof raw.metadata?.postory_user_id === "string" ? raw.metadata.postory_user_id : null;
+  return {
+    ...base,
+    rawStatus: raw.status ?? "unknown",
+    userId,
+    amountCents,
+    monthlyCents: amountCents === null ? null : Math.round(amountCents / monthsPerInterval),
+    interval,
+    intervalCount,
+    createdAt: toDate(raw.start_date ?? raw.created),
+    endedAt: toDate(raw.ended_at),
+    taggedForPostory: Object.keys(raw.metadata ?? {}).some((k) => k.startsWith("postory_")),
   };
 }
 
@@ -267,6 +318,27 @@ async function resumeSubscription(reference: string) {
   await request("POST", `/v1/subscriptions/${encodeURIComponent(reference)}/resume`, {});
 }
 
+/**
+ * Every subscription on the HandyPay account (GET /v1/subscriptions, the
+ * documented list endpoint), newest first. Bounded so a large account can't
+ * stall a page.
+ */
+async function listSubscriptions(options: { maxPages?: number } = {}): Promise<{ subscriptions: AdminSubscription[]; truncated: boolean }> {
+  const out: AdminSubscription[] = [];
+  let startingAfter: string | undefined;
+  for (let page = 0; page < (options.maxPages ?? 10); page++) {
+    const query = new URLSearchParams({ status: "all", limit: "100" });
+    if (startingAfter) query.set("starting_after", startingAfter);
+    const res = await request<{ data?: RawSubscription[]; has_more?: boolean } | RawSubscription[]>("GET", `/v1/subscriptions?${query}`);
+    const rows = Array.isArray(res) ? res : (res.data ?? []);
+    for (const row of rows) if (row.id) out.push(mapAdminSubscription(row));
+    const more = !Array.isArray(res) && Boolean(res.has_more);
+    if (!more || !rows.length) return { subscriptions: out, truncated: false };
+    startingAfter = rows[rows.length - 1]?.id;
+  }
+  return { subscriptions: out, truncated: true };
+}
+
 async function createPortalSession(reference: string, returnUrl: string) {
   const res = await request<{ url?: string }>("POST", `/v1/subscriptions/${encodeURIComponent(reference)}/portal-session`, { return_url: returnUrl });
   if (!res.url) throw new BillingUnavailableError("provider_error", "HandyPay didn't return a management link.");
@@ -281,4 +353,5 @@ export const handypay = {
   cancelSubscription,
   resumeSubscription,
   createPortalSession,
+  listSubscriptions,
 };

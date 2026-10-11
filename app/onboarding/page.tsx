@@ -9,6 +9,7 @@ import { StepRail } from "@/components/onboarding/step-rail";
 import { BackButton, BusinessStep, FinishButton, NextStepButton, VoiceStep } from "@/components/onboarding/steps";
 import { CheckoutReturnNotice, ConnectionReturnToast } from "@/components/onboarding/return-notices";
 import { Notice } from "@/components/ui/notice";
+import { getAdminRole } from "@/lib/auth/admin";
 import { getProfile, requireUser } from "@/lib/auth/session";
 import { billingAvailability, getSubscriptionRow } from "@/lib/billing/service";
 import { PLANS } from "@/lib/billing/plans";
@@ -24,7 +25,10 @@ const HEADINGS: Record<string, { title: string; body: string }> = {
   business: { title: "Tell us about the business.", body: "Postory writes from what you tell it — nothing invented. Start with the basics." },
   social: { title: "Connect your social accounts.", body: "Postory publishes only to accounts you connect, and only after you approve each post." },
   voice: { title: "How should Postory sound?", body: "Optional. This shapes every post. You can change it any time in Settings." },
-  plan: { title: "Pick a plan.", body: "Every plan includes the approval workflow, calendar and business memory. Start with a 3-day trial." },
+  plan: {
+    title: "Start your 3-day trial.",
+    body: "Every plan includes the approval workflow, calendar and business memory. You won't be charged until the trial ends, and you can cancel before then.",
+  },
   finish: { title: "You're set.", body: "Tell Postory what's happening in your business and it will turn it into posts for your review." },
 };
 
@@ -34,8 +38,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   if (!profile) redirect("/auth/signout");
   if (profile.onboarding_completed) redirect("/app");
 
-  const params = await searchParams;
-  const step = profile.onboarding_step;
+  const [params, entitlements, adminRole] = await Promise.all([searchParams, getEntitlements(user.id), getAdminRole(user)]);
+  // Postory opens once a trial has started. Staff, and deployments without
+  // billing, may continue without one.
+  const canSkipPlan = Boolean(adminRole) || !billingAvailability().checkout;
+  const step = profile.onboarding_step === "finish" && !entitlements.active && !canSkipPlan ? "plan" : profile.onboarding_step;
   const heading = HEADINGS[step] ?? HEADINGS.business;
 
   return (
@@ -70,7 +77,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
         {step === "social" ? <SocialStep userId={user.id} /> : null}
         {step === "voice" ? <VoiceStepLoader userId={user.id} /> : null}
-        {step === "plan" ? <PlanStep userId={user.id} checkoutParam={params.checkout} eventParam={params.billing} /> : null}
+        {step === "plan" ? <PlanStep userId={user.id} checkoutParam={params.checkout} eventParam={params.billing} canSkip={canSkipPlan} /> : null}
         {step === "finish" ? <FinishStep userId={user.id} /> : null}
       </div>
     </div>
@@ -103,7 +110,7 @@ async function VoiceStepLoader({ userId }: { userId: string }) {
   );
 }
 
-async function PlanStep({ userId, checkoutParam, eventParam }: { userId: string; checkoutParam?: string; eventParam?: string }) {
+async function PlanStep({ userId, checkoutParam, eventParam, canSkip }: { userId: string; checkoutParam?: string; eventParam?: string; canSkip: boolean }) {
   const [entitlements, subscription] = await Promise.all([getEntitlements(userId), getSubscriptionRow(userId)]);
   const availability = billingAvailability();
 
@@ -140,7 +147,7 @@ async function PlanStep({ userId, checkoutParam, eventParam }: { userId: string;
       {eventParam ? <CheckoutReturnNotice status={eventParam} /> : null}
       {checkoutParam === "canceled" ? <Notice tone="info" title="Checkout was cancelled. No charge was made." className="mx-auto mb-6 max-w-2xl" /> : null}
       {availability.checkout ? (
-        <PlanPicker returnPath="/onboarding" trialEligible={!subscription?.trial_ends_at} />
+        <PlanPicker returnPath="/onboarding" trialEligible={!subscription} />
       ) : (
         <>
           <Notice tone="info" title="Billing isn't live yet" className="mx-auto mb-8 max-w-2xl">
@@ -160,7 +167,7 @@ async function PlanStep({ userId, checkoutParam, eventParam }: { userId: string;
       )}
       <div className="mx-auto mt-10 flex max-w-2xl items-center justify-between">
         <BackButton to="voice" />
-        <NextStepButton to="finish" label="Continue without a plan" variant="ghost" />
+        {canSkip ? <NextStepButton to="finish" label="Continue without a plan" variant="ghost" /> : null}
       </div>
     </div>
   );
@@ -186,7 +193,7 @@ async function FinishStep({ userId }: { userId: string }) {
         </li>
       </ul>
       {!entitlements.active ? (
-        <p className="mt-4 text-center text-sm text-muted">You can explore Postory now. Generating and publishing posts needs a plan.</p>
+        <p className="mt-4 text-center text-sm text-muted">Generating and publishing posts needs a plan — you can start a trial from Billing.</p>
       ) : null}
       <div className="mt-8 flex items-center justify-between">
         <BackButton to="plan" />

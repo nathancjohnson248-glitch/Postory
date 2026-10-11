@@ -6,7 +6,7 @@ import { PlanCards } from "@/components/billing/plan-cards";
 import { PlanPicker } from "@/components/billing/plan-picker";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { PLANS, TRIAL_DAYS, isPlanId } from "@/lib/billing/plans";
 import { billingAvailability, syncSubscription } from "@/lib/billing/service";
 import { getEntitlements, getUsageSummary } from "@/lib/entitlements";
@@ -26,7 +26,7 @@ const STATUS: Record<string, { label: string; tone: "success" | "blue" | "warnin
 };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ billing?: string; checkout?: string }> }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const params = await searchParams;
   const tz = safeTimeZone(profile.timezone);
   const subscription = await syncSubscription(user.id);

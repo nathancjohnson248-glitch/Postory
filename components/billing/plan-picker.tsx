@@ -8,7 +8,7 @@ import { startPlanCheckout } from "@/app/_actions/billing";
 import type { PlanId } from "@/lib/billing/plans";
 
 /** Plan cards wired to HandyPay checkout. Only rendered when checkout is available. */
-export function PlanPicker({ returnPath, trialEligible }: { returnPath: "/onboarding" | "/app/billing"; trialEligible: boolean }) {
+export function PlanPicker({ returnPath, trialEligible }: { returnPath: "/onboarding" | "/start" | "/app/billing"; trialEligible: boolean }) {
   const [pending, setPending] = useState<PlanId | null>(null);
 
   async function choose(plan: PlanId) {

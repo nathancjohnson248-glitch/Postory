@@ -13,7 +13,8 @@ import { idSchema } from "@/lib/validation/schemas";
  */
 export async function GET(request: NextRequest) {
   const url = request.nextUrl;
-  const next = url.searchParams.get("next") === "/onboarding" ? "/onboarding" : "/app/billing";
+  const requested = url.searchParams.get("next");
+  const next = requested === "/onboarding" || requested === "/start" ? requested : "/app/billing";
   const target = publicUrl(request, next);
 
   const user = await getSessionUser();
@@ -28,6 +29,12 @@ export async function GET(request: NextRequest) {
   try {
     const result = await reconcileCheckout(user.id, event.data);
     target.searchParams.set("billing", result.status === "completed" ? "confirmed" : result.status === "expired" ? "expired" : "pending");
+    // Trial confirmed from the start page: straight into the app.
+    if (next === "/start" && result.status === "completed") {
+      target.pathname = "/app";
+      target.search = "";
+      target.searchParams.set("welcome", "1");
+    }
     if (result.status === "completed" && result.subscription?.status === "trialing" && result.subscription.plan) {
       await sendEmail(user.email, "trialStarted", {
         planName: PLANS[result.subscription.plan].name,

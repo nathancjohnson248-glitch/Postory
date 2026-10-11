@@ -8,7 +8,7 @@ import { PageHeader, Section } from "@/components/app/section";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { getAnalytics } from "@/lib/data/analytics";
 import { getEntitlements } from "@/lib/entitlements";
 import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = { title: "Analytics" };
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const { range } = await searchParams;
   const tz = safeTimeZone(profile.timezone);
   const rangeDays = range === "90" ? 90 : 30;

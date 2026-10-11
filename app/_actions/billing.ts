@@ -8,11 +8,13 @@ import { UserFacingError } from "@/lib/errors";
 import { runAction } from "./_run";
 
 /** Start a HandyPay checkout — for a first subscription or a plan change. */
-export async function startPlanCheckout(plan: string, returnPath: "/onboarding" | "/app/billing") {
+const RETURN_PATHS = ["/onboarding", "/start", "/app/billing"] as const;
+
+export async function startPlanCheckout(plan: string, returnPath: (typeof RETURN_PATHS)[number]) {
   return runAction("billing.checkout", async (user) => {
     const parsed = planSchema.safeParse(plan);
     if (!parsed.success) throw new UserFacingError("invalid_plan", "Unknown plan.");
-    const url = await billing.startCheckout(user, parsed.data, returnPath === "/onboarding" ? "/onboarding" : "/app/billing");
+    const url = await billing.startCheckout(user, parsed.data, RETURN_PATHS.includes(returnPath) ? returnPath : "/app/billing");
     return { url };
   });
 }

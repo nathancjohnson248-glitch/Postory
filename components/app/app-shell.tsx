@@ -15,6 +15,7 @@ import {
   PenLine,
   Plus,
   Settings,
+  ShieldCheck,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
@@ -33,6 +34,7 @@ export function AppShell({
   planLabel,
   planTone,
   reviewCount,
+  isAdmin = false,
 }: {
   children: ReactNode;
   user: { name: string; email: string | null };
@@ -40,6 +42,7 @@ export function AppShell({
   planLabel: string;
   planTone: "ok" | "warn";
   reviewCount: number;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -53,6 +56,7 @@ export function AppShell({
     { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
   ];
   const secondary: NavItem[] = [
+    ...(isAdmin ? [{ href: "/app/admin", label: "Admin", icon: ShieldCheck }] : []),
     { href: "/app/settings", label: "Settings", icon: Settings },
     { href: "/app/billing", label: "Billing", icon: CreditCard },
   ];

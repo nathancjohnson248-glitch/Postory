@@ -10,7 +10,7 @@ import { ResetPasswordForm } from "@/components/onboarding/auth-forms";
 import { ButtonLink } from "@/components/ui/button";
 import { readPreferences } from "@/lib/ai/context";
 import { aiAvailable } from "@/lib/ai/client";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { getNetworkStates } from "@/lib/data/social";
 import { getEntitlements } from "@/lib/entitlements";
 import { PLANS } from "@/lib/billing/plans";
@@ -34,7 +34,7 @@ const NAV = [
 ] as const;
 
 export default async function SettingsPage() {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const supabase = await createClient();
   const [networks, readiness, entitlements, { data: memory }] = await Promise.all([
     getNetworkStates(user.id),

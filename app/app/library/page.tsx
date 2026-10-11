@@ -6,7 +6,7 @@ import { PostRow } from "@/components/app/post-row";
 import { PageHeader } from "@/components/app/section";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { requireOnboardedUser } from "@/lib/auth/session";
+import { requireAppAccess } from "@/lib/auth/access";
 import { reconcileQuietly } from "@/lib/data/home";
 import { listPosts } from "@/lib/data/posts";
 import { STATUS_LABEL, STATUS_TONE, type PostStatus } from "@/lib/posts/state-machine";
@@ -49,7 +49,7 @@ function escapeLike(q: string) {
 }
 
 export default async function LibraryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const { user, profile } = await requireOnboardedUser();
+  const { user, profile } = await requireAppAccess();
   const params = await searchParams;
   const view = params.view === "posts" ? "posts" : "stories";
   const q = (params.q ?? "").trim().slice(0, 100);
