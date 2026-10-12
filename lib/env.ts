@@ -51,6 +51,9 @@ export const env = {
   smtpUser: () => read("SMTP_USER"),
   smtpPassword: () => read("SMTP_PASSWORD"),
   smtpFrom: () => read("SMTP_FROM") ?? read("SMTP_USER"),
+  /** Sign-up and reset codes by email; switched on only once delivery is confirmed. */
+  authEmailCodes: () => read("AUTH_EMAIL_CODES") === "on",
+  emailTestToken: () => read("EMAIL_TEST_TOKEN"),
 
   devPlan: () => (process.env.NODE_ENV === "development" ? read("POSTORY_DEV_PLAN") : undefined),
 };

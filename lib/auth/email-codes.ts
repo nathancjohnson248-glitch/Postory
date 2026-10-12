@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
-import { integrations } from "@/lib/env";
+import { env, integrations } from "@/lib/env";
 import { sendEmail } from "@/lib/email/send";
 import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -27,7 +27,7 @@ export type CodeOutcome =
   | { status: "failed" };
 
 export function postorySendsAuthEmail() {
-  return integrations.email() && integrations.supabaseAdmin();
+  return integrations.email() && integrations.supabaseAdmin() && env.authEmailCodes();
 }
 
 /**

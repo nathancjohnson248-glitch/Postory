@@ -38,7 +38,8 @@ export async function sendEmail<T extends EmailTemplate>(to: string | null | und
 
   if (integrations.smtp()) {
     try {
-      await smtpTransport().sendMail({ from: env.smtpFrom(), to, subject, html, text });
+      const info = await smtpTransport().sendMail({ from: env.smtpFrom(), to, subject, html, text });
+      log.info("email sent", { operation: "email.send", provider: "smtp", template, response: String(info.response).slice(0, 120) });
       return { sent: true as const };
     } catch (error) {
       log.warn("email failed", { operation: "email.send", provider: "smtp", template }, error);

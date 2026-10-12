@@ -23,6 +23,11 @@ const codeBlock = (code: string) =>
   `<p style="margin:24px 0;padding:18px 20px;border-radius:14px;background:#f3f3f0;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:34px;font-weight:600;letter-spacing:0.22em;color:#0c0c0e">${escape(code)}</p>`;
 
 export const templates = {
+  deliveryTest: (input: { sentAt: string }) => ({
+    subject: "Postory email test",
+    text: `If you can read this, Postory can send email from its own address. Sent ${input.sentAt}.`,
+    html: layout("Email is working.", p(`If you can read this, Postory can send email from its own address. Sent ${input.sentAt}.`)),
+  }),
   signupCode: (input: { code: string }) => ({
     subject: `${input.code} is your Postory code`,
     text: `Your Postory confirmation code is ${input.code}. Enter it on the sign-up page to confirm your email. It expires in an hour. If you didn't sign up for Postory, you can ignore this email.`,
