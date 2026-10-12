@@ -180,7 +180,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
             ) : accountName ? (
               <p className="truncate text-[13px] text-muted">{accountName}</p>
             ) : (
-              <Link href="/app/settings#accounts" className="text-[13px] text-blue-600 hover:underline">
+              <Link href="/app/connections" className="text-[13px] text-blue-600 hover:underline">
                 Connect {meta.name}
               </Link>
             )}
@@ -298,7 +298,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
             {post.errorCode === "platform_auth_failed" ? (
               <>
                 {" "}
-                <Link href="/app/settings#accounts" className="font-medium text-blue-600 hover:underline">
+                <Link href="/app/connections" className="font-medium text-blue-600 hover:underline">
                   Reconnect {meta.name}
                 </Link>
               </>

@@ -452,7 +452,7 @@ async function loadPublishTarget(userId: string, post: StoryPost) {
     const name = PLATFORM_META[account.platform as Platform].name;
     throw new UserFacingError("reconnect_required", `${name} needs to be reconnected before Postory can post to it.`, {
       label: `Reconnect ${name}`,
-      href: "/app/settings#accounts",
+      href: "/app/connections",
     });
   }
   if (account.platform !== post.platform) throw new UserFacingError("platform_mismatch", "This account is for a different network.");

@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   PenLine,
+  Plug,
   Plus,
   Settings,
   ShieldCheck,
@@ -54,6 +55,7 @@ export function AppShell({
     { href: "/app/inbox", label: "Inbox", icon: Inbox },
     { href: "/app/library", label: "Library", icon: Library, badge: reviewCount || undefined },
     { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
+    { href: "/app/connections", label: "Connections", icon: Plug },
   ];
   const secondary: NavItem[] = [
     ...(isAdmin ? [{ href: "/app/admin", label: "Admin", icon: ShieldCheck }] : []),
@@ -116,7 +118,7 @@ export function AppShell({
         <div className="mt-7">
           <div className="mb-2 flex items-center justify-between px-3">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">Connected accounts</p>
-            <Link href="/app/settings#accounts" className="rounded text-faint transition-colors hover:text-ink" aria-label="Manage connected accounts">
+            <Link href="/app/connections" className="rounded text-faint transition-colors hover:text-ink" aria-label="Manage connected accounts">
               <Plus className="size-3.5" />
             </Link>
           </div>
@@ -124,7 +126,7 @@ export function AppShell({
             <ul className="flex flex-col gap-0.5">
               {accounts.slice(0, 8).map((a) => (
                 <li key={a.id}>
-                  <Link href="/app/settings#accounts" className="flex h-8 items-center gap-2.5 rounded-lg px-3 text-[13px] text-ink-soft transition-colors hover:bg-wash">
+                  <Link href="/app/connections" className="flex h-8 items-center gap-2.5 rounded-lg px-3 text-[13px] text-ink-soft transition-colors hover:bg-wash">
                     <PlatformIcon platform={a.platform} tile className="size-5 rounded-md" />
                     <span className="min-w-0 flex-1 truncate">{a.name}</span>
                     <span
@@ -136,7 +138,7 @@ export function AppShell({
               ))}
             </ul>
           ) : (
-            <Link href="/app/settings#accounts" className="mx-1 block rounded-xl border border-dashed border-line-strong px-3 py-2.5 text-[13px] text-muted transition-colors hover:border-ink-soft hover:text-ink">
+            <Link href="/app/connections" className="mx-1 block rounded-xl border border-dashed border-line-strong px-3 py-2.5 text-[13px] text-muted transition-colors hover:border-ink-soft hover:text-ink">
               Connect your first network
             </Link>
           )}
@@ -196,7 +198,7 @@ export function AppShell({
 
       <Dialog open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" className="lg:hidden">
         <div className="flex flex-col gap-1">
-          {[primary[1], primary[3], primary[5], ...secondary].map((item) => navLink(item, () => setMenuOpen(false)))}
+          {[primary[1], primary[3], primary[5], primary[6], ...secondary].map((item) => navLink(item, () => setMenuOpen(false)))}
           <form action="/auth/signout" method="post" className="mt-2 border-t border-line pt-2">
             <button className="flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[14px] font-medium text-muted hover:bg-wash hover:text-ink">
               <LogOut className="size-[17px]" aria-hidden />

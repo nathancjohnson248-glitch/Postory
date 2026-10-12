@@ -7,7 +7,7 @@ import { idSchema, platformSchema } from "@/lib/validation/schemas";
 import { UserFacingError } from "@/lib/errors";
 import { runAction } from "./_run";
 
-const returnPathSchema = z.enum(["/onboarding", "/app/settings"]).catch("/app/settings");
+const returnPathSchema = z.enum(["/onboarding", "/app/connections"]).catch("/app/connections");
 
 export async function connectNetwork(platform: string, returnPath: string) {
   return runAction("social.connect", async (user) => {

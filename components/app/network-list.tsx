@@ -30,7 +30,7 @@ export function NetworkList({
 }: {
   rows: NetworkRow[];
   readiness: { ready: boolean; message?: string };
-  returnPath: "/onboarding" | "/app/settings";
+  returnPath: "/onboarding" | "/app/connections";
 }) {
   const router = useRouter();
   const [connecting, setConnecting] = useState<Platform | null>(null);

@@ -196,13 +196,13 @@ export const templates = {
 
   connectionIssue: (input: { network: string }) => ({
     subject: `Reconnect ${input.network} to keep posting`,
-    text: `Postory can no longer post to ${input.network}. Reconnect it at ${site.url}/app/settings#accounts`,
+    text: `Postory can no longer post to ${input.network}. Reconnect it at ${site.url}/app/connections`,
     html: layout({
       preheader: `Scheduled ${input.network} posts are on hold until it's reconnected.`,
       body:
         h1(`${input.network} needs to be reconnected.`) +
         p(`The connection may have expired or been revoked. Scheduled posts for ${input.network} won't go out until it's reconnected.`) +
-        button(`Reconnect ${input.network}`, `${site.url}/app/settings#accounts`),
+        button(`Reconnect ${input.network}`, `${site.url}/app/connections`),
     }),
   }),
 };

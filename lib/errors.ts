@@ -51,7 +51,7 @@ export function describeSocialError(
       return {
         code,
         message: `${name} didn't accept Postory's saved connection. It may have expired or been revoked. Reconnect ${name} and try again.`,
-        action: { label: `Reconnect ${name}`, href: "/app/settings#accounts" },
+        action: { label: `Reconnect ${name}`, href: "/app/connections" },
       };
     case "platform_rejected":
       return { code, message: `${name} rejected this post.${remediation || " Check the content and try again."}` };

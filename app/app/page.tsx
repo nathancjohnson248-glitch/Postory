@@ -24,7 +24,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const signals = [
     data.counts.review ? { icon: PenLine, text: `${pluralize(data.counts.review, "post")} ${data.counts.review === 1 ? "needs" : "need"} your approval`, href: "/app/library?view=posts&status=review", tone: "text-blue-700 bg-blue-50 ring-blue-100" } : null,
     data.counts.week ? { icon: CalendarClock, text: `${pluralize(data.counts.week, "post")} scheduled this week`, href: "/app/calendar?view=agenda", tone: "text-ink-soft bg-surface ring-line" } : null,
-    data.counts.attention ? { icon: Plug, text: `${pluralize(data.counts.attention, "network")} ${data.counts.attention === 1 ? "needs" : "need"} attention`, href: "/app/settings#accounts", tone: "text-warning bg-warning-wash ring-[#f6e1bb]" } : null,
+    data.counts.attention ? { icon: Plug, text: `${pluralize(data.counts.attention, "network")} ${data.counts.attention === 1 ? "needs" : "need"} attention`, href: "/app/connections", tone: "text-warning bg-warning-wash ring-[#f6e1bb]" } : null,
     data.failed.length ? { icon: AlertTriangle, text: `${pluralize(data.failed.length, "post")} failed to publish`, href: "/app/library?view=posts&status=failed", tone: "text-danger bg-danger-wash ring-[#f6cfcd]" } : null,
   ].filter((s): s is NonNullable<typeof s> => s !== null);
 
@@ -146,7 +146,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             )}
           </Section>
 
-          <Section title="Networks" href="/app/settings#accounts" hrefLabel="Manage">
+          <Section title="Networks" href="/app/connections" hrefLabel="Manage">
             {connected.length ? (
               <ul className="stagger-in flex flex-col gap-0.5 px-2 pb-2">
                 {connected.map((a) => (
@@ -162,7 +162,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             ) : (
               <div className="px-4 pb-5">
                 <p className="text-sm text-muted">Connect your first network so approved posts can go out.</p>
-                <Link href="/app/settings#accounts" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline">
+                <Link href="/app/connections" className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline">
                   Connect a network <ArrowRight className="size-3.5" />
                 </Link>
               </div>

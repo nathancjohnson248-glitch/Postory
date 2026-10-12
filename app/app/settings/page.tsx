@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 import { Bot, Check, CreditCard, Mail, Minus, Workflow } from "lucide-react";
-import { NetworkList } from "@/components/app/network-list";
 import { PageHeader } from "@/components/app/section";
 import { AiPreferencesForm, BusinessForm, DeleteAccount, MemoryManager, ProfileForm, SettingsCard, VoiceForm } from "@/components/app/settings/forms";
-import { ConnectionReturnToast } from "@/components/onboarding/return-notices";
 import { ResetPasswordForm } from "@/components/onboarding/auth-forms";
 import { ButtonLink } from "@/components/ui/button";
 import { readPreferences } from "@/lib/ai/context";
@@ -14,7 +11,6 @@ import { requireAppAccess } from "@/lib/auth/access";
 import { getNetworkStates } from "@/lib/data/social";
 import { getEntitlements } from "@/lib/entitlements";
 import { PLANS } from "@/lib/billing/plans";
-import { getSocialReadiness } from "@/lib/social/service";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatform, type Platform } from "@/lib/social/platforms";
 import { safeTimeZone } from "@/lib/time";
@@ -25,7 +21,7 @@ const NAV = [
   ["profile", "Profile"],
   ["business", "Business"],
   ["voice", "Voice"],
-  ["accounts", "Connected accounts"],
+  ["accounts", "Connections"],
   ["memory", "Business memory"],
   ["ai", "AI preferences"],
   ["permissions", "Permissions"],
@@ -38,9 +34,8 @@ const NAV = [
 export default async function SettingsPage() {
   const { user, profile } = await requireAppAccess();
   const supabase = await createClient();
-  const [networks, readiness, entitlements, { data: memory }] = await Promise.all([
+  const [networks, entitlements, { data: memory }] = await Promise.all([
     getNetworkStates(user.id),
-    getSocialReadiness(user.id),
     getEntitlements(user.id),
     supabase.from("business_memory").select("id,category,key,value,source").eq("user_id", user.id).order("category").order("updated_at", { ascending: false }),
   ]);
@@ -64,9 +59,6 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <Suspense>
-        <ConnectionReturnToast />
-      </Suspense>
       <PageHeader title="Settings" description="Your profile, your business, and what Postory can do on your behalf." />
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
         <nav aria-label="Settings sections" className="hidden lg:block">
@@ -95,8 +87,15 @@ export default async function SettingsPage() {
           <SettingsCard id="voice" title="Voice" description="How Postory should sound.">
             <VoiceForm presets={tone ? tone.split(", ") : []} notes={voice.find((v) => v.key === "notes")?.value ?? ""} />
           </SettingsCard>
-          <SettingsCard id="accounts" title="Connected accounts" description="Postory publishes only to these, and only after you approve.">
-            <NetworkList rows={networks} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/app/settings" />
+          <SettingsCard id="accounts" title="Connections" description="Postory publishes only to these, and only after you approve.">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[14px] text-ink-soft">
+                {connectedCount ? `${connectedCount} connected.` : "Nothing connected yet."} Connect, reconnect and disconnect networks on the Connections page.
+              </p>
+              <ButtonLink href="/app/connections" size="sm" variant="secondary">
+                Open Connections
+              </ButtonLink>
+            </div>
           </SettingsCard>
           <SettingsCard id="memory" title="Business memory" description="Facts Postory may use. If it isn't here or in your story, Postory won't claim it.">
             <MemoryManager rows={(memory ?? []).map((m) => ({ id: m.id, category: m.category, key: m.key, value: m.value, source: m.source }))} />
