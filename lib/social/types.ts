@@ -37,6 +37,7 @@ export type ProviderPostStatus = "queued" | "validated" | "publishing" | "publis
 export type PublishResult = {
   status: ProviderPostStatus;
   externalPostId: string | null;
+  platformPostId?: string | null;
   batchId: string | null;
   uri: string | null;
   warnings: string[];
@@ -45,6 +46,8 @@ export type PublishResult = {
 
 export type ProviderPost = {
   externalPostId: string;
+  /** The network's own id for the post, when the provider reports it. */
+  platformPostId?: string | null;
   status: ProviderPostStatus;
   scheduledAt: string | null;
   publishedAt: string | null;

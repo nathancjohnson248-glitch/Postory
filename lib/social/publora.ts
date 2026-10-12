@@ -196,7 +196,7 @@ type GroupResponse = {
   postGroupId: string;
   status?: string;
   scheduledTime?: string | null;
-  posts?: { status?: string; permalink?: string | null; error?: { code?: string; message?: string } | null }[];
+  posts?: { status?: string; permalink?: string | null; postedId?: string | null; error?: { code?: string; message?: string } | null }[];
 };
 
 function mapStatus(group: GroupResponse): ProviderPostStatus {
@@ -224,6 +224,7 @@ function toProviderPost(group: GroupResponse): ProviderPost {
   const status = mapStatus(group);
   return {
     externalPostId: group.postGroupId,
+    platformPostId: post?.postedId ?? null,
     status,
     scheduledAt: group.scheduledTime ?? null,
     publishedAt: status === "published" ? new Date().toISOString() : null,
@@ -282,6 +283,7 @@ export async function createPost(input: PublishRequest): Promise<PublishResult> 
   return {
     status: latest?.status === "published" || latest?.status === "failed" ? latest.status : "publishing",
     externalPostId: res.postGroupId,
+    platformPostId: latest?.platformPostId ?? null,
     batchId: null,
     uri: latest?.uri ?? null,
     warnings,

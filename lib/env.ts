@@ -39,6 +39,20 @@ export const env = {
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
   handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
+  // Gemini is Postory's model provider; OpenAI is only a fallback.
+  geminiApiKey: () => read("GEMINI_API_KEY"),
+  geminiModel: () => read("GEMINI_MODEL") ?? "gemini-3.5-flash",
+  geminiImageModel: () => read("GEMINI_IMAGE_MODEL") ?? "gemini-3.1-flash-image",
+
+  // Cloudflare Workers AI: post images.
+  cloudflareAccountId: () => read("CLOUDFLARE_ACCOUNT_ID"),
+  cloudflareAiToken: () => read("CLOUDFLARE_AI_TOKEN"),
+  cloudflareImageModel: () => read("CLOUDFLARE_IMAGE_MODEL") ?? "@cf/leonardo/lucid-origin",
+
+  // Groq: fast text fallback (OpenAI-compatible API). No images.
+  groqApiKey: () => read("GROQ_API_KEY"),
+  groqModel: () => read("GROQ_MODEL") ?? "openai/gpt-oss-120b",
+
   openaiApiKey: () => read("OPENAI_API_KEY"),
   openaiModel: () => read("OPENAI_MODEL") ?? "gpt-5.4-mini",
   openaiImageModel: () => read("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
@@ -78,6 +92,9 @@ export const integrations = {
   publora: () => Boolean(env.publoraApiKey()),
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
+  gemini: () => Boolean(env.geminiApiKey()),
+  groq: () => Boolean(env.groqApiKey()),
+  cloudflareAi: () => Boolean(env.cloudflareAccountId() && env.cloudflareAiToken()),
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
@@ -96,6 +113,9 @@ export function integrationStatus(): IntegrationStatus {
     publora: integrations.publora(),
     privy: integrations.privy(),
     handypay: integrations.handypay(),
+    gemini: integrations.gemini(),
+    groq: integrations.groq(),
+    cloudflareAi: integrations.cloudflareAi(),
     openai: integrations.openai(),
     resend: integrations.resend(),
     smtp: integrations.smtp(),

@@ -590,6 +590,7 @@ export async function publishNow(userId: string, postId: string) {
           published_at: new Date().toISOString(),
           external_post_id: result.externalPostId,
           external_url: webUrl(result.uri),
+          platform_post_id: result.platformPostId ?? null,
           provider_batch_id: result.batchId,
         })
         .eq("id", post.id)
@@ -806,6 +807,7 @@ async function refreshPostFromProvider(userId: string, post: StoryPost) {
   if (next === "published") {
     update.published_at = remote.publishedAt ?? new Date().toISOString();
     update.external_url = webUrl(remote.uri);
+    if (remote.platformPostId) update.platform_post_id = remote.platformPostId;
   }
   if (next === "failed") {
     const described = describeSocialError(remote.error?.code ?? "platform_rejected", {

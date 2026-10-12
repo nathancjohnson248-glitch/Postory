@@ -7,6 +7,7 @@ import { MissingInfo } from "@/components/app/story/missing-info";
 import { PostCard, type PostCardContext } from "@/components/app/story/post-card";
 import { StoryToolbar } from "@/components/app/story/story-toolbar";
 import { GeneratedToast } from "@/components/app/story/generated-toast";
+import { AnglePicker } from "@/components/app/story/angle-picker";
 import { Badge } from "@/components/ui/badge";
 import { Notice } from "@/components/ui/notice";
 import { aiAvailable } from "@/lib/ai/client";
@@ -94,13 +95,13 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
           {analysis.angles?.length ? (
             <div className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line">
               <p className="text-[13px] font-semibold">Angles</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {analysis.angles.map((a) => (
-                  <span key={a} className="rounded-full bg-blue-50 px-2.5 py-1 text-[12.5px] font-medium text-blue-700">
-                    {a}
-                  </span>
-                ))}
-              </div>
+              {aiAvailable() && entitlements.active ? <p className="mt-0.5 text-[12.5px] text-muted">Tap one to rewrite the open drafts around it.</p> : null}
+              <AnglePicker
+                storyId={story.id}
+                angles={analysis.angles}
+                current={posts.length && posts.every((p) => p.angle === posts[0].angle) ? (posts[0].angle ?? null) : null}
+                aiEnabled={aiAvailable() && entitlements.active}
+              />
               {analysis.schedulingSuggestion ? <p className="mt-4 text-[13px] text-muted">{analysis.schedulingSuggestion}</p> : null}
             </div>
           ) : null}

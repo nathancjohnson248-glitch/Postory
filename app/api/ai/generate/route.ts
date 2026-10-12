@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: { code: "unauthenticated", message: "Log in again." } }, { status: 401 });
   if (!aiAvailable()) {
     return Response.json(
-      { error: { code: "not_configured", message: "Post generation isn't configured on this deployment yet (OPENAI_API_KEY is missing)." } },
+      { error: { code: "not_configured", message: "Postory's writer isn't switched on yet. Try again soon." } },
       { status: 503 },
     );
   }

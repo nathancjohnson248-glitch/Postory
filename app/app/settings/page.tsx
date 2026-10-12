@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Check, CreditCard, Minus } from "lucide-react";
+import { Bot, Check, CreditCard, Mail, Minus, Workflow } from "lucide-react";
 import { NetworkList } from "@/components/app/network-list";
 import { PageHeader } from "@/components/app/section";
 import { AiPreferencesForm, BusinessForm, DeleteAccount, MemoryManager, ProfileForm, SettingsCard, VoiceForm } from "@/components/app/settings/forms";
@@ -29,6 +29,8 @@ const NAV = [
   ["memory", "Business memory"],
   ["ai", "AI preferences"],
   ["permissions", "Permissions"],
+  ["notifications", "Notifications"],
+  ["automation", "Automation & agents"],
   ["billing", "Billing"],
   ["security", "Security"],
 ] as const;
@@ -54,7 +56,8 @@ export default async function SettingsPage() {
     { label: "Publish to your connected accounts", on: connectedCount > 0, detail: connectedCount ? `${connectedCount} connected. Only after you approve a post, and only when you press Publish or a schedule you set fires.` : "No accounts connected." },
     { label: "Use your business memory when writing", on: true, detail: "Your profile, voice and saved facts — nothing else." },
     { label: "Send your story text to the AI model", on: aiAvailable(), detail: "Only when you generate, edit with AI, or ask the assistant." },
-    { label: "Read comments, messages or analytics from your networks", on: false, detail: "Not available through Postory's publishing provider today." },
+    { label: "Read comments or messages from your networks", on: false, detail: "Not available through Postory's publishing provider today." },
+    { label: "Run on autopilot or take instructions from AI agents", on: false, detail: "Off. See Automation & agents below." },
     { label: "Delete posts from your networks", on: false, detail: "Postory never deletes anything you've published." },
   ];
 
@@ -114,6 +117,51 @@ export default async function SettingsPage() {
                 </li>
               ))}
             </ul>
+          </SettingsCard>
+          <SettingsCard id="notifications" title="Notifications" description={`Postory emails ${user.email ?? "you"} only when something needs you.`}>
+            <ul className="flex flex-col gap-3">
+              {[
+                ["A post fails to publish", "With the network's reason and a link to fix it."],
+                ["A network needs reconnecting", "Scheduled posts for it are held until you do."],
+                ["Your trial starts", "With the date it ends. No marketing emails."],
+              ].map(([title, body]) => (
+                <li key={title} className="flex items-start gap-3">
+                  <Mail className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
+                  <div>
+                    <p className="text-[14px] font-medium">{title}</p>
+                    <p className="text-[13px] text-muted">{body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SettingsCard>
+          <SettingsCard id="automation" title="Automation & agents" description="Optional, advanced, and never on by default.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                {
+                  icon: Workflow,
+                  title: "Autopilot",
+                  body: "Pick networks, how often, quiet hours and topics to avoid, and Postory drafts on a rhythm. Publishing stays approval-first unless you change the rule. Replies always wait for you.",
+                },
+                {
+                  icon: Bot,
+                  title: "Agent access",
+                  body: "Let tools like Claude Code or Cursor create stories and drafts in Postory for you to approve — through a scoped key you can revoke any time.",
+                },
+              ].map((f) => (
+                <div key={f.title} className="rounded-2xl bg-wash p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-[14px] font-semibold">
+                      <f.icon className="size-4 text-ink-soft" aria-hidden />
+                      {f.title}
+                    </span>
+                    <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted ring-1 ring-line">Not live yet</span>
+                  </div>
+                  <p className="mt-2 text-[13px] leading-relaxed text-muted">{f.body}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 text-[13px] text-muted">Neither is switched on for any account today, and nothing here can publish for you.</p>
           </SettingsCard>
           <SettingsCard id="billing" title="Billing">
             <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">

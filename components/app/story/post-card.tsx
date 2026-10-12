@@ -59,6 +59,18 @@ export type PostCardContext = {
 
 type Result = { ok: true } | { ok: false; error: { message: string; action?: { label: string; href: string } } };
 
+
+/** One-tap edits. Each changes only this network's version and keeps the facts. */
+const TONE_PRESETS = [
+  { label: "Shorter", instruction: "Make it noticeably shorter. Keep every fact." },
+  { label: "More direct", instruction: "Make it more direct: lead with the point, cut hedging and filler." },
+  { label: "More playful", instruction: "Make it more playful and light, without changing any facts." },
+  { label: "More founder-like", instruction: "Rewrite it in a first-person founder voice — candid and specific, not corporate." },
+  { label: "More technical", instruction: "Make it more technical and precise for a knowledgeable audience, using only details already given." },
+  { label: "More conversational", instruction: "Make it more conversational, like talking to a friend." },
+  { label: "Sound like me", instruction: "Rewrite it to match my brand voice and preferences in business memory as closely as possible." },
+];
+
 export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }) {
   const router = useRouter();
   const meta = PLATFORM_META[post.platform];
@@ -97,8 +109,8 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
     if (ok) setMode("preview");
   }
 
-  async function adapt() {
-    const text = instruction.trim();
+  async function adapt(preset?: string) {
+    const text = (preset ?? instruction).trim();
     if (!text) return;
     setBusy("adapt");
     const result = await adaptPostAction({ postId: post.id, instruction: text });
@@ -107,7 +119,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
       toast.error(result.error.message);
       return;
     }
-    setInstruction("");
+    if (!preset) setInstruction("");
     setDraft(result.data.content);
     setLastChange(result.data.summary);
     result.data.warnings.forEach((w) => toast.warning(w));
@@ -357,6 +369,21 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
         ) : null}
 
         {/* Adapt */}
+        {editable && ctx.aiEnabled ? (
+          <div className="mt-4 -mb-2 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" role="group" aria-label={`Quick changes for ${meta.name}`}>
+            {TONE_PRESETS.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => adapt(t.instruction)}
+                className="h-8 shrink-0 rounded-full bg-surface px-3 text-[12.5px] font-medium text-ink-soft ring-1 ring-line transition-all hover:-translate-y-px hover:text-ink hover:ring-line-strong disabled:opacity-40"
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {editable && ctx.aiEnabled ? (
           <form
             className="mt-4 flex items-center gap-2 rounded-2xl bg-wash p-1.5 focus-within:ring-2 focus-within:ring-blue-100"

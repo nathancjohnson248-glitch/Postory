@@ -1,8 +1,7 @@
 import "server-only";
 
-import { zodTextFormat } from "openai/helpers/zod";
 import { PLATFORM_META, countCharacters, type Platform } from "@/lib/social/platforms";
-import { getOpenAI, models } from "./client";
+import { generateStructured, LlmError } from "./llm";
 import { findUnsupportedNumbers } from "./factuality";
 import { GENERATE_SYSTEM, generateUserPrompt, type BusinessContext } from "./prompts";
 import { ModelGeneration, ValidatedGeneration, type GenerationResult } from "./types";
@@ -11,17 +10,13 @@ export type GeneratedPostWithChecks = GenerationResult["posts"][number] & {
   warnings: string[];
 };
 
-export class GenerationError extends Error {
-  constructor(public readonly code: "invalid_output" | "refused" | "provider_error", message: string) {
-    super(message);
-    this.name = "GenerationError";
-  }
-}
+/** Errors from the model layer, under the name the rest of the app uses. */
+export { LlmError as GenerationError };
 
 /** Validate model output and attach review warnings (unsupported numbers, length). */
 export function checkGeneration(raw: unknown, platforms: Platform[], corpus: string) {
   const parsed = ValidatedGeneration.safeParse(raw);
-  if (!parsed.success) throw new GenerationError("invalid_output", "The writer returned something Postory couldn't use. Try again.");
+  if (!parsed.success) throw new LlmError("invalid_output", "The writer returned something Postory couldn't use. Try again.");
 
   const wanted = new Set(platforms);
   const seen = new Set<Platform>();
@@ -39,26 +34,17 @@ export function checkGeneration(raw: unknown, platforms: Platform[], corpus: str
     if (length > limit) warnings.push(`${length - limit} characters over the ${PLATFORM_META[post.platform].name} limit.`);
     posts.push({ ...post, warnings });
   }
-  if (posts.length === 0) throw new GenerationError("invalid_output", "The writer didn't produce posts for the networks you chose. Try again.");
+  if (posts.length === 0) throw new LlmError("invalid_output", "The writer didn't produce posts for the networks you chose. Try again.");
 
   return { ...parsed.data, posts, missingPlatforms: platforms.filter((p) => !seen.has(p)) };
 }
 
-export async function generatePosts(input: { story: string; platforms: Platform[]; context: BusinessContext; corpus: string }) {
-  const openai = getOpenAI();
-  let response;
-  try {
-    response = await openai.responses.parse({
-      model: models.text(),
-      input: [
-        { role: "system", content: GENERATE_SYSTEM },
-        { role: "user", content: generateUserPrompt(input) },
-      ],
-      text: { format: zodTextFormat(ModelGeneration, "story_posts") },
-    });
-  } catch (error) {
-    throw new GenerationError("provider_error", error instanceof Error ? error.message : "OpenAI request failed.");
-  }
-  if (!response.output_parsed) throw new GenerationError("refused", "The writer declined this request. Rephrase the story and try again.");
-  return checkGeneration(response.output_parsed, input.platforms, input.corpus);
+export async function generatePosts(input: { story: string; platforms: Platform[]; context: BusinessContext; corpus: string; angle?: string }) {
+  const raw = await generateStructured({
+    system: GENERATE_SYSTEM,
+    turns: [{ role: "user", content: generateUserPrompt(input) }],
+    schema: ModelGeneration,
+    name: "story_posts",
+  });
+  return checkGeneration(raw, input.platforms, input.corpus);
 }

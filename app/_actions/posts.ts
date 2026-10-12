@@ -194,6 +194,68 @@ export async function regeneratePost(postId: string) {
   });
 }
 
+/**
+ * Rewrite a story's open drafts around one of its angles. Approved, scheduled
+ * and published posts are left exactly as they are.
+ */
+export async function rewriteStoryAroundAngle(input: { storyId: string; angle: string }) {
+  return runAction("posts.angle", async (user) => {
+    const storyId = idSchema.parse(input.storyId);
+    const admin = createAdminClient();
+    const { data: story } = await admin.from("stories").select("id,source_text,angles").eq("id", storyId).eq("user_id", user.id).maybeSingle();
+    if (!story) throw new UserFacingError("not_found", "That story doesn't exist any more.");
+    const raw = story.angles as { angles?: unknown } | unknown[] | null;
+    const known = (Array.isArray(raw) ? raw : Array.isArray(raw?.angles) ? raw.angles : []).filter((a): a is string => typeof a === "string");
+    // Only an angle Postory found for this story — never free text from the browser.
+    const angle = known.find((a) => a === input.angle);
+    if (!angle) throw new UserFacingError("invalid", "Pick one of this story's angles.");
+
+    const { data: drafts } = await admin
+      .from("story_posts")
+      .select("id,platform,version,status")
+      .eq("story_id", storyId)
+      .eq("user_id", user.id)
+      .in("status", ["draft", "awaiting_review", "rejected"]);
+    if (!drafts?.length) throw new UserFacingError("nothing_to_rewrite", "Every post here is already approved or scheduled. Move one back to review to rewrite it.");
+
+    const entitlements = await getEntitlements(user.id);
+    const usage = await consumeUsage(user.id, entitlements, "ai_generation");
+    try {
+      const context = await loadBusinessContext(user.id);
+      const platforms = [...new Set(drafts.map((d) => d.platform as Platform))];
+      const result = await generatePosts({ story: story.source_text, platforms, context, corpus: factCorpus(context, story.source_text), angle });
+      let rewritten = 0;
+      for (const fresh of result.posts) {
+        const target = drafts.find((d) => d.platform === fresh.platform);
+        if (!target) continue;
+        const { data } = await admin
+          .from("story_posts")
+          .update({
+            content: fresh.content,
+            generated_content: fresh.content,
+            angle,
+            reasoning: fresh.reasoning,
+            media_suggestion: fresh.mediaNeeded ? fresh.mediaSuggestion : null,
+            last_edited_by: "ai",
+            status: "awaiting_review",
+            version: target.version + 1,
+          })
+          .eq("id", target.id)
+          .eq("user_id", user.id)
+          .eq("version", target.version)
+          .select("id")
+          .maybeSingle();
+        if (data) rewritten += 1;
+      }
+      refresh(storyId);
+      return { rewritten, warnings: result.posts.flatMap((p) => p.warnings) };
+    } catch (error) {
+      await usage.release();
+      throw error;
+    }
+  });
+}
+
 export async function publishPostNow(postId: string) {
   return runAction("posts.publish", async (user) => {
     const post = await social.publishNow(user.id, idSchema.parse(postId));
@@ -259,7 +321,7 @@ export async function generateImageAction(input: { postId: string; direction?: s
         orientation,
       });
       const id = crypto.randomUUID();
-      const path = `${user.id}/${post.id}/${id}.png`;
+      const path = `${user.id}/${post.id}/${id}.${image.extension}`;
       const admin = createAdminClient();
       const { error } = await admin.storage.from(MEDIA_BUCKET).upload(path, image.bytes, { contentType: image.contentType });
       if (error) throw new Error("Could not store the generated image.");

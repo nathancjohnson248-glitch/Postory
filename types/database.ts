@@ -470,6 +470,9 @@ export type Database = {
           media: Json
           media_suggestion: string | null
           platform: string
+          platform_post_id: string | null
+          metrics: Json | null
+          metrics_synced_at: string | null
           provider_batch_id: string | null
           publish_attempts: number
           published_at: string | null
@@ -497,6 +500,9 @@ export type Database = {
           media?: Json
           media_suggestion?: string | null
           platform: string
+          platform_post_id?: string | null
+          metrics?: Json | null
+          metrics_synced_at?: string | null
           provider_batch_id?: string | null
           publish_attempts?: number
           published_at?: string | null
@@ -524,6 +530,9 @@ export type Database = {
           media?: Json
           media_suggestion?: string | null
           platform?: string
+          platform_post_id?: string | null
+          metrics?: Json | null
+          metrics_synced_at?: string | null
           provider_batch_id?: string | null
           publish_attempts?: number
           published_at?: string | null

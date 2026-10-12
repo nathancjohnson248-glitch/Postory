@@ -18,10 +18,12 @@ export function toFailure(error: unknown, operation: string, userId?: string): R
   if (error instanceof InvalidTransitionError) return fail("invalid_state", error.message);
   if (error instanceof BillingUnavailableError) return fail(`billing_${error.code}`, error.message);
   if (error instanceof GenerationError) {
-    log.warn("ai generation error", { operation, userId, provider: "openai", code: error.code }, error);
+    log.warn("ai generation error", { operation, userId, code: error.code }, error);
     return fail(
       `ai_${error.code}`,
-      error.code === "provider_error" ? "Postory's writer is unavailable right now. Nothing was used from your plan. Try again shortly." : error.message,
+      error.code === "provider_error" || error.code === "unavailable"
+        ? "Postory's writer is unavailable right now. Nothing was used from your plan. Try again shortly."
+        : error.message,
     );
   }
   if (error instanceof ConfigurationError) {
