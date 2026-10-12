@@ -12,6 +12,7 @@ import "server-only";
  *   POST   /posts                   publish now / schedule
  *   GET    /posts?startDate&endDate post state (QUEUE/PUBLISHED/ERROR/DRAFT)
  *   DELETE /posts/{id}              delete a post (and its group)
+ *   POST   /integration-trigger/{id} provider tools (Pinterest "boards")
  *
  * Postiz keeps every channel in one workspace, so Postory records which
  * channel belongs to which customer (see the service's shared-workspace path).
@@ -32,6 +33,7 @@ const CONNECT_AS: Partial<Record<Platform, string>> = {
   instagram: "instagram-standalone",
   threads: "threads",
   tiktok: "tiktok",
+  pinterest: "pinterest",
 };
 
 /** Networks Postory can connect and publish to through Postiz. */
@@ -186,6 +188,15 @@ function settingsFor(platform: Platform, provider: string | undefined) {
   }
 }
 
+/** POST /integration-trigger/{id} with the Pinterest "boards" tool: the boards a Pin can be saved to. */
+async function pinterestBoards(integrationId: string) {
+  const res = await request<{ output?: { id?: string; name?: string }[] }>(`/integration-trigger/${encodeURIComponent(integrationId)}`, {
+    method: "POST",
+    json: { methodName: "boards", data: {} },
+  });
+  return (res.output ?? []).filter((b): b is { id: string; name: string } => typeof b.id === "string" && typeof b.name === "string");
+}
+
 async function importMedia(urls: string[]) {
   const media: { id: string; path: string }[] = [];
   for (const url of urls) {
@@ -200,6 +211,15 @@ export async function createPost(input: PublishRequest): Promise<PublishResult> 
   if (!CONNECT_AS[input.platform]) {
     return { status: "failed", externalPostId: null, batchId: null, uri: null, warnings: [], error: { code: "platform_not_enabled", message: "Publishing to this network isn't available yet." } };
   }
+  // A Pin has to live on a board; use the account's first one.
+  let settings: Record<string, unknown> = settingsFor(input.platform, input.providerHint);
+  if (input.platform === "pinterest") {
+    const [board] = await pinterestBoards(input.accountExternalId);
+    if (!board) {
+      return { status: "failed", externalPostId: null, batchId: null, uri: null, warnings: [], error: { code: "platform_rejected", message: "Create a board on Pinterest first — every Pin is saved to a board." } };
+    }
+    settings = { __type: "pinterest", board: board.id };
+  }
   const image = input.mediaUrls?.length ? await importMedia(input.mediaUrls) : [];
   const res = await request<{ postId?: string; integration?: string }[]>("/posts", {
     method: "POST",
@@ -208,7 +228,7 @@ export async function createPost(input: PublishRequest): Promise<PublishResult> 
       date: (input.scheduledAt ?? new Date()).toISOString(),
       shortLink: false,
       tags: [],
-      posts: [{ integration: { id: input.accountExternalId }, value: [{ content: input.text, image }], settings: settingsFor(input.platform, input.providerHint) }],
+      posts: [{ integration: { id: input.accountExternalId }, value: [{ content: input.text, image }], settings }],
     },
     timeoutMs: 60_000,
   });
