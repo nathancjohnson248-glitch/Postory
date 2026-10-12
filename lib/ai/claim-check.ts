@@ -45,6 +45,7 @@ export async function removeUnsupportedClaims<P extends { platform: Platform; co
       ],
       schema: CheckSchema,
       name: "claim_check",
+      tier: "fast",
     });
     let changed = 0;
     const result = posts.map((post) => {

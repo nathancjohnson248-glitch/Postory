@@ -44,7 +44,7 @@ const TOPICS: Topic[] = [
     body: (
       <>
         <p>
-          Open <strong>Connections</strong> and press <strong>Connect</strong> next to a network. You sign in on the network&apos;s own page and approve access — Postory never sees your password. Bluesky uses an app password you create in Bluesky&apos;s settings.
+          Open <strong>Connections</strong> and press <strong>Connect</strong> next to a network. You sign in on the network&apos;s own page and approve access — Postory never sees your password. Bluesky and Pinterest are coming soon; you can already write posts for them.
         </p>
         <p>Instagram needs a Business or Creator account, and Facebook posts go to a Page you manage. If a connection expires, the network shows <strong>Reconnect required</strong> and any scheduled posts for it wait until you reconnect.</p>
         <p>You can write posts for a network before it&apos;s connected; they stay as drafts until you connect it.</p>

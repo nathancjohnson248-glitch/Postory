@@ -25,6 +25,7 @@ import { MEDIA_BUCKET, parseMedia, type PostMedia } from "@/lib/posts/media";
 import { assertTransition, isPostStatus, type PostStatus } from "@/lib/posts/state-machine";
 import { PLATFORM_META, validatePostContent, type Platform } from "./platforms";
 import { activeProvider, type ProviderName, type SocialProviderApi } from "./provider";
+import { postMetrics as postizMetrics } from "./postiz";
 import { blueskyPostMetrics, createManagedUser, linkedinPostMetrics, type PostMetrics } from "./publora";
 import { SocialProviderError, type ProviderAccount, type ProviderPostStatus } from "./types";
 import type { Tables } from "@/types/database";
@@ -43,10 +44,15 @@ export type SocialReadiness =
   | { ready: false; reason: "provider_not_configured" | "workspace_not_linked"; message: string };
 
 const NOT_CONFIGURED = "Social publishing isn't configured on this Postory deployment yet.";
+const SHARED_WORKSPACE = "shared";
+/** In a shared workspace, only one person connects a given network at a time, so new channels can't be mixed up. */
+const SHARED_CONNECT_LOCK_MS = 10 * 60 * 1000;
 
 export async function getSocialReadiness(userId: string): Promise<SocialReadiness> {
   const provider = activeProvider();
   if (!provider) return { ready: false, reason: "provider_not_configured", message: NOT_CONFIGURED };
+  // One workspace for everyone; ownership of each channel is recorded in Postory.
+  if (provider.sharedWorkspace) return { ready: true, workspaceId: SHARED_WORKSPACE, provider };
   let workspace = await getWorkspaceId(userId, provider.name);
   if (!workspace && provider.name === "publora") {
     try {
@@ -149,6 +155,10 @@ export async function listConnectedAccounts(userId: string) {
  */
 export async function startConnection(userId: string, platform: Platform, returnPath: string) {
   const { workspaceId, p } = await requireWorkspace(userId);
+  if (p.platforms && !p.platforms.includes(platform)) {
+    throw new UserFacingError("platform_not_enabled", `Connecting ${PLATFORM_META[platform].name} isn't available yet. Your other networks work as normal.`);
+  }
+  if (p.sharedWorkspace) await assertConnectSlotFree(userId, platform);
 
   const [entitlements, existing] = await Promise.all([getEntitlements(userId), listConnectedAccounts(userId)]);
   const connectedCount = existing.filter((a) => a.status !== "disconnected").length;
@@ -261,6 +271,33 @@ async function markAttempt(attemptId: string, status: "completed" | "failed" | "
     .eq("id", attemptId);
 }
 
+async function assertConnectSlotFree(userId: string, platform: Platform) {
+  const admin = createAdminClient();
+  const since = new Date(Date.now() - SHARED_CONNECT_LOCK_MS).toISOString();
+  const { count } = await admin
+    .from("social_connection_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("platform", platform)
+    .eq("status", "pending")
+    .neq("user_id", userId)
+    .gte("created_at", since);
+  if (count) {
+    throw new UserFacingError(
+      "connect_busy",
+      `Someone else is finishing a ${PLATFORM_META[platform].name} connection right now. Try again in a minute or two.`,
+    );
+  }
+}
+
+/** External ids of channels already claimed in Postory, by anyone (shared workspace) or by this user. */
+async function claimedIds(provider: ProviderName, userId?: string) {
+  const admin = createAdminClient();
+  let query = admin.from("social_accounts").select("external_account_id").eq("provider", provider);
+  if (userId) query = query.eq("user_id", userId);
+  const { data } = await query;
+  return new Set((data ?? []).map((r) => r.external_account_id));
+}
+
 async function reconcileAttempt(userId: string, attempt: Tables<"social_connection_attempts">, workspaceId: string, p: SocialProviderApi) {
   const platform = attempt.platform as Platform;
   let accounts: ProviderAccount[];
@@ -273,8 +310,18 @@ async function reconcileAttempt(userId: string, attempt: Tables<"social_connecti
   }
 
   const before = new Set(attempt.accounts_before);
-  const forPlatform = accounts.filter((a) => a.platform === platform && a.externalProfileId === workspaceId);
-  const fresh = forPlatform.filter((a) => !before.has(a.externalId));
+  let forPlatform: ProviderAccount[];
+  let fresh: ProviderAccount[];
+  if (p.sharedWorkspace) {
+    // New = appeared since the attempt started and not claimed by anyone yet; the connect lock keeps that unambiguous.
+    const [anyone, mine] = await Promise.all([claimedIds(p.name), claimedIds(p.name, userId)]);
+    const ofPlatform = accounts.filter((a) => a.platform === platform);
+    fresh = ofPlatform.filter((a) => !before.has(a.externalId) && !anyone.has(a.externalId));
+    forPlatform = ofPlatform.filter((a) => mine.has(a.externalId));
+  } else {
+    forPlatform = accounts.filter((a) => a.platform === platform && a.externalProfileId === workspaceId);
+    fresh = forPlatform.filter((a) => !before.has(a.externalId));
+  }
   // Reconnecting an existing account rotates its token without creating a new id.
   const touched = fresh.length > 0 ? fresh : forPlatform;
 
@@ -343,7 +390,13 @@ export async function syncAccounts(userId: string) {
   const { workspaceId, p } = await requireWorkspace(userId);
   let accounts: ProviderAccount[];
   try {
-    accounts = (await p.listAccounts(workspaceId)).filter((a) => a.externalProfileId === workspaceId);
+    const all = await p.listAccounts(workspaceId);
+    if (p.sharedWorkspace) {
+      const mine = await claimedIds(p.name, userId);
+      accounts = all.filter((a) => mine.has(a.externalId));
+    } else {
+      accounts = all.filter((a) => a.externalProfileId === workspaceId);
+    }
   } catch (error) {
     throw toUserError(error, undefined, "sync") ?? error;
   }
@@ -429,6 +482,11 @@ async function loadOwnedPost(userId: string, postId: string) {
   if (!post) throw new UserFacingError("not_found", "That post wasn't found.");
   if (!isPostStatus(post.status)) throw new Error(`Unknown post status ${post.status}`);
   return post as StoryPost & { status: PostStatus };
+}
+
+function providerHintFor(account: SocialAccount) {
+  const hint = (account.metadata as { postizProvider?: unknown } | null)?.postizProvider;
+  return typeof hint === "string" ? hint : undefined;
 }
 
 async function loadPublishTarget(userId: string, post: StoryPost) {
@@ -569,6 +627,7 @@ export async function publishNow(userId: string, postId: string) {
       mediaUrls: urls,
       externalProfileId: workspaceId,
       idempotencyKey: post.idempotency_key,
+      providerHint: providerHintFor(account),
     });
 
     // Accepted and still going out: the reconciler records the final outcome.
@@ -698,6 +757,7 @@ export async function schedulePost(userId: string, postId: string, when: Date) {
       scheduledAt: when,
       externalProfileId: workspaceId,
       idempotencyKey: post.idempotency_key,
+      providerHint: providerHintFor(account),
     });
     if (result.status !== "queued" && result.status !== "validated") {
       throw new SocialProviderError(result.error?.code ?? "platform_rejected", result.error?.message ?? "The post wasn't queued.", {
@@ -734,7 +794,7 @@ export async function schedulePost(userId: string, postId: string, when: Date) {
   }
 }
 
-export async function reschedulePost(userId: string, postId: string, when: Date) {
+export async function reschedulePost(userId: string, postId: string, when: Date): Promise<StoryPost> {
   if (when.getTime() < Date.now() + MIN_SCHEDULE_LEAD_MS) {
     throw new UserFacingError("invalid_time", "Pick a time at least a couple of minutes from now.");
   }
@@ -743,6 +803,11 @@ export async function reschedulePost(userId: string, postId: string, when: Date)
     throw new UserFacingError("invalid_state", "Only scheduled posts can be moved.");
   }
   const { workspaceId, p } = await requireWorkspace(userId);
+  if (!p.canReschedule) {
+    // No in-place move at this provider: take it off the schedule and schedule it again.
+    await unschedulePost(userId, postId);
+    return schedulePost(userId, postId, when);
+  }
   try {
     await p.reschedulePost(post.external_post_id, when, workspaceId);
   } catch (error) {
@@ -879,6 +944,7 @@ export async function reconcileDuePosts(userId: string, limit = 15) {
  * best-effort and the page renders with whatever is already stored.
  */
 export async function syncPostMetrics(userId: string) {
+  if (activeProvider()?.name === "postiz") return syncPostizMetrics(userId);
   if (activeProvider()?.name !== "publora") return;
   try {
     const workspaceId = await getWorkspaceId(userId, "publora");
@@ -918,5 +984,29 @@ export async function syncPostMetrics(userId: string) {
     }
   } catch (error) {
     log.warn("metrics sync failed", { operation: "social.metrics", userId, provider: "publora" }, error);
+  }
+}
+
+/** Postiz reports engagement per post it published; refreshed at most every two hours. */
+async function syncPostizMetrics(userId: string) {
+  try {
+    const admin = createAdminClient();
+    const staleBefore = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await admin
+      .from("story_posts")
+      .select("id,external_post_id")
+      .eq("user_id", userId)
+      .eq("status", "published")
+      .not("external_post_id", "is", null)
+      .gte("published_at", new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+      .or(`metrics_synced_at.is.null,metrics_synced_at.lt.${staleBefore}`)
+      .limit(15);
+    const now = new Date().toISOString();
+    for (const row of rows ?? []) {
+      const metrics = await postizMetrics(row.external_post_id!).catch(() => null);
+      await admin.from("story_posts").update({ metrics_synced_at: now, ...(metrics ? { metrics } : {}) }).eq("id", row.id).eq("user_id", userId);
+    }
+  } catch (error) {
+    log.warn("metrics sync failed", { operation: "social.metrics", userId, provider: "postiz" }, error);
   }
 }

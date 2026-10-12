@@ -34,6 +34,9 @@ export const env = {
 
   letmepostApiKey: () => read("LETMEPOST_API_KEY"),
   publoraApiKey: () => read("PUBLORA_API_KEY"),
+  postizApiKey: () => read("POSTIZ_API_KEY"),
+  /** Postiz Cloud by default; a self-hosted instance is https://your-domain/api/public/v1. */
+  postizApiUrl: () => (read("POSTIZ_API_URL") ?? "https://api.postiz.com/public/v1").replace(/\/+$/, ""),
   letmepostBaseUrl: () => (read("LETMEPOST_API_BASE_URL") ?? "https://api.letmepost.dev").replace(/\/+$/, ""),
 
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
@@ -52,6 +55,12 @@ export const env = {
   // Groq: fast text fallback (OpenAI-compatible API). No images.
   groqApiKey: () => read("GROQ_API_KEY"),
   groqModel: () => read("GROQ_MODEL") ?? "openai/gpt-oss-120b",
+  openrouterApiKey: () => read("OPENROUTER_API_KEY"),
+  /** The writer: quality first. */
+  openrouterModel: () => read("OPENROUTER_MODEL") ?? "anthropic/claude-sonnet-5.5",
+  /** Quick checks (claim check): fast and cheap. */
+  openrouterFastModel: () => read("OPENROUTER_FAST_MODEL") ?? "anthropic/claude-haiku-5.5",
+  openrouterImageModel: () => read("OPENROUTER_IMAGE_MODEL") ?? "bytedance-seed/seedream-5-0-lite",
 
   openaiApiKey: () => read("OPENAI_API_KEY"),
   openaiModel: () => read("OPENAI_MODEL") ?? "gpt-5.4-mini",
@@ -90,10 +99,12 @@ export const integrations = {
   supabaseAdmin: () => Boolean(env.supabaseUrl() && env.supabaseSecretKey()),
   letmepost: () => Boolean(env.letmepostApiKey()),
   publora: () => Boolean(env.publoraApiKey()),
+  postiz: () => Boolean(env.postizApiKey()),
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   gemini: () => Boolean(env.geminiApiKey()),
   groq: () => Boolean(env.groqApiKey()),
+  openrouter: () => Boolean(env.openrouterApiKey()),
   cloudflareAi: () => Boolean(env.cloudflareAccountId() && env.cloudflareAiToken()),
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
@@ -111,10 +122,12 @@ export function integrationStatus(): IntegrationStatus {
     supabaseAdmin: integrations.supabaseAdmin(),
     letmepost: integrations.letmepost(),
     publora: integrations.publora(),
+    postiz: integrations.postiz(),
     privy: integrations.privy(),
     handypay: integrations.handypay(),
     gemini: integrations.gemini(),
     groq: integrations.groq(),
+    openrouter: integrations.openrouter(),
     cloudflareAi: integrations.cloudflareAi(),
     openai: integrations.openai(),
     resend: integrations.resend(),

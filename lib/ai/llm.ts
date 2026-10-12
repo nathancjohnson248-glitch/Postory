@@ -7,8 +7,9 @@ import { ConfigurationError, env, integrations } from "@/lib/env";
 import { log } from "@/lib/log";
 
 /**
- * Postory's one door to a language model. Text goes to Gemini first, then
- * Groq, then OpenAI — whichever are configured — and a provider that refuses
+ * Postory's one door to a language model. Text goes to OpenRouter first
+ * (Claude Sonnet for writing, Haiku for quick checks), then Gemini, Groq and
+ * OpenAI — whichever are configured — and a provider that refuses
  * access is skipped for a while so people never wait on a known failure.
  * Images go to Cloudflare Workers AI, then Gemini, then OpenAI; Groq has no
  * image model. Every call asks
@@ -30,7 +31,7 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
 
-type TextProvider = "gemini" | "groq" | "openai";
+type TextProvider = "openrouter" | "gemini" | "groq" | "openai";
 
 /** Providers that answered "no access" recently, and until when to skip them. */
 const benched = new Map<TextProvider, number>();
@@ -38,6 +39,7 @@ const BENCH_MS = 10 * 60_000;
 
 function textProviders(): TextProvider[] {
   const all: TextProvider[] = [];
+  if (integrations.openrouter()) all.push("openrouter");
   if (integrations.gemini()) all.push("gemini");
   if (integrations.groq()) all.push("groq");
   if (integrations.openai()) all.push("openai");
@@ -52,7 +54,7 @@ export function llmProvider(): TextProvider | null {
 }
 
 export function imageAvailable() {
-  return integrations.cloudflareAi() || integrations.gemini() || integrations.openai();
+  return integrations.cloudflareAi() || integrations.openrouter() || integrations.gemini() || integrations.openai();
 }
 
 /** JSON Schema for Gemini's responseJsonSchema, from the zod model schema. */
@@ -117,7 +119,14 @@ function openai() {
  * message), and the schema the answer must follow. Returns the parsed JSON
  * (unvalidated against limits — callers apply their own validated schema).
  */
-type StructuredInput<S extends z.ZodType> = { system: string; turns: ChatTurn[]; schema: S; name: string };
+type StructuredInput<S extends z.ZodType> = {
+  system: string;
+  turns: ChatTurn[];
+  schema: S;
+  name: string;
+  /** "fast" for quick checks where a smaller model is enough. */
+  tier?: "best" | "fast";
+};
 
 async function viaGemini<S extends z.ZodType>(input: StructuredInput<S>): Promise<unknown> {
   const data = await gemini(
@@ -130,6 +139,40 @@ async function viaGemini<S extends z.ZodType>(input: StructuredInput<S>): Promis
     90_000,
   );
   return geminiText(data);
+}
+
+let openrouterClient: OpenAI | null = null;
+function openrouter() {
+  const apiKey = env.openrouterApiKey();
+  if (!apiKey) throw new ConfigurationError("OPENROUTER_API_KEY");
+  openrouterClient ??= new OpenAI({
+    apiKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    timeout: 90_000,
+    maxRetries: 1,
+    defaultHeaders: { "HTTP-Referer": "https://postory.lol", "X-Title": "Postory" },
+  });
+  return openrouterClient;
+}
+
+async function viaOpenRouter<S extends z.ZodType>(input: StructuredInput<S>): Promise<unknown> {
+  try {
+    const res = await openrouter().chat.completions.create({
+      model: input.tier === "fast" ? env.openrouterFastModel() : env.openrouterModel(),
+      temperature: 0.5,
+      max_tokens: 3500,
+      messages: [{ role: "system", content: input.system }, ...input.turns.map((t) => ({ role: t.role, content: t.content }))],
+      response_format: { type: "json_schema", json_schema: { name: input.name, strict: true, schema: jsonSchemaFor(input.schema) } },
+    });
+    return res.choices[0]?.message?.content ?? "";
+  } catch (error) {
+    const status = (error as { status?: number }).status;
+    log.warn("openrouter request failed", { operation: "ai.openrouter", provider: "openrouter", status }, error);
+    // 402 = out of credit; treat like "switched off" so the next provider takes over.
+    if (status === 401 || status === 402 || status === 403) throw new LlmError("unavailable", "Postory's writer is switched off right now. Try again later.");
+    if (status === 429) throw new LlmError("provider_error", "Postory's writer is busy. Try again in a minute.");
+    throw new LlmError("provider_error", "Postory's writer hit a problem. Try again.");
+  }
 }
 
 let groqClient: OpenAI | null = null;
@@ -186,7 +229,14 @@ export async function generateStructured<S extends z.ZodType>(input: StructuredI
   let lastError: unknown = null;
   for (const provider of providers) {
     try {
-      const out = provider === "gemini" ? await viaGemini(input) : provider === "groq" ? await viaGroq(input) : await viaOpenAI(input);
+      const out =
+        provider === "openrouter"
+          ? await viaOpenRouter(input)
+          : provider === "gemini"
+            ? await viaGemini(input)
+            : provider === "groq"
+              ? await viaGroq(input)
+              : await viaOpenAI(input);
       let parsed: unknown = out;
       if (typeof out === "string") {
         if (!out.trim()) throw new LlmError("invalid_output", "The writer returned nothing. Try again.");
@@ -216,9 +266,61 @@ export async function generateStructured<S extends z.ZodType>(input: StructuredI
 export type ImageShape = "square" | "portrait" | "landscape";
 
 /** One image for a post. Gemini's image model by default, OpenAI's as fallback. */
-export async function generateImageBytes(prompt: string, shape: ImageShape): Promise<{ bytes: Buffer; contentType: string; extension: string }> {
-  const provider = integrations.cloudflareAi() ? "cloudflare" : integrations.gemini() ? "gemini" : integrations.openai() ? "openai" : null;
-  if (!provider) throw new LlmError("unavailable", "Image generation isn't set up on this deployment yet.");
+type ImageResult = { bytes: Buffer; contentType: string; extension: string };
+type ImageProvider = "cloudflare" | "openrouter" | "gemini" | "openai";
+
+/**
+ * One image for a post. Providers are tried in order — Cloudflare Workers AI,
+ * OpenRouter, Gemini, OpenAI — and one that's out of quota or unreachable
+ * hands over to the next.
+ */
+export async function generateImageBytes(prompt: string, shape: ImageShape): Promise<ImageResult> {
+  const providers: ImageProvider[] = [];
+  if (integrations.cloudflareAi()) providers.push("cloudflare");
+  if (integrations.openrouter()) providers.push("openrouter");
+  if (integrations.gemini()) providers.push("gemini");
+  if (integrations.openai()) providers.push("openai");
+  if (!providers.length) throw new LlmError("unavailable", "Image generation isn't set up on this deployment yet.");
+
+  let lastError: unknown = null;
+  for (const provider of providers) {
+    try {
+      return await imageVia(provider, prompt, shape);
+    } catch (error) {
+      lastError = error;
+      if (error instanceof LlmError && (error.code === "unavailable" || error.code === "provider_error")) continue;
+      throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new LlmError("provider_error", "Image generation hit a problem. Try again.");
+}
+
+async function imageVia(provider: ImageProvider, prompt: string, shape: ImageShape): Promise<ImageResult> {
+  if (provider === "openrouter") {
+    const aspectRatio = shape === "portrait" ? "4:5" : shape === "landscape" ? "16:9" : "1:1";
+    let res: Response;
+    try {
+      res = await fetch("https://openrouter.ai/api/v1/images", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.openrouterApiKey()}`, "Content-Type": "application/json", "HTTP-Referer": "https://postory.lol", "X-Title": "Postory" },
+        body: JSON.stringify({ model: env.openrouterImageModel(), prompt: prompt.slice(0, 2000), aspect_ratio: aspectRatio, n: 1 }),
+        signal: AbortSignal.timeout(150_000),
+        cache: "no-store",
+      });
+    } catch (error) {
+      log.warn("openrouter image request failed", { operation: "ai.openrouter.image", provider: "openrouter" }, error);
+      throw new LlmError("provider_error", "Image generation didn't respond. Try again.");
+    }
+    const data = (await res.json().catch(() => ({}))) as { data?: { b64_json?: string; media_type?: string }[] };
+    const image = data.data?.[0];
+    if (!res.ok || !image?.b64_json) {
+      log.warn("openrouter image error", { operation: "ai.openrouter.image", provider: "openrouter", status: res.status });
+      if (res.status === 401 || res.status === 402 || res.status === 403) throw new LlmError("unavailable", "Image generation is switched off right now. Try again later.");
+      throw new LlmError("provider_error", "Image generation hit a problem. Try again.");
+    }
+    const contentType = image.media_type || "image/png";
+    return { bytes: Buffer.from(image.b64_json, "base64"), contentType, extension: contentType === "image/jpeg" ? "jpg" : contentType === "image/webp" ? "webp" : "png" };
+  }
 
   if (provider === "cloudflare") {
     const [width, height] = shape === "portrait" ? [1024, 1280] : shape === "landscape" ? [1536, 864] : [1024, 1024];
@@ -241,7 +343,8 @@ export async function generateImageBytes(prompt: string, shape: ImageShape): Pro
     const data = (await res.json().catch(() => ({}))) as { success?: boolean; result?: { image?: string }; errors?: { code?: number; message?: string }[] };
     if (!res.ok || !data.success || !data.result?.image) {
       log.warn("cloudflare image error", { operation: "ai.cloudflare.image", provider: "cloudflare", status: res.status, code: data.errors?.[0]?.code });
-      if (res.status === 401 || res.status === 403) throw new LlmError("unavailable", "Image generation is switched off right now. Try again later.");
+      // 4006 = the daily free allocation is used up; let the next provider take it.
+      if (res.status === 401 || res.status === 403 || data.errors?.[0]?.code === 4006) throw new LlmError("unavailable", "Image generation is switched off right now. Try again later.");
       if (res.status === 429) throw new LlmError("provider_error", "Image generation is busy. Try again in a minute.");
       throw new LlmError("provider_error", "Image generation hit a problem. Try again.");
     }

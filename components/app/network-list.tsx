@@ -27,10 +27,13 @@ export function NetworkList({
   rows,
   readiness,
   returnPath,
+  unavailable = [],
 }: {
   rows: NetworkRow[];
   readiness: { ready: boolean; message?: string };
   returnPath: "/onboarding" | "/app/connections";
+  /** Networks the publishing provider can't connect yet; shown honestly instead of a failing button. */
+  unavailable?: Platform[];
 }) {
   const router = useRouter();
   const [connecting, setConnecting] = useState<Platform | null>(null);
@@ -142,6 +145,7 @@ export function NetworkList({
           else if (needsReconnect.length) state = { label: "Reconnect required", tone: "text-warning", icon: <AlertCircle className="size-3.5" /> };
           else if (connected.length) state = { label: "Connected", tone: "text-success", icon: <Check className="size-3.5" /> };
           else if (error) state = { label: "Connection failed", tone: "text-danger", icon: <AlertCircle className="size-3.5" /> };
+          else if (unavailable.includes(row.platform)) state = { label: "Coming soon", tone: "text-faint", icon: null };
           else state = { label: "Not connected", tone: "text-muted", icon: null };
 
           return (
@@ -176,7 +180,7 @@ export function NetworkList({
                     Disconnect
                   </ConfirmButton>
                 ))}
-                {needsReconnect.length || connected.length === 0 ? (
+                {(needsReconnect.length || connected.length === 0) && !unavailable.includes(row.platform) ? (
                   <Button
                     size="sm"
                     variant={needsReconnect.length ? "accent" : "secondary"}

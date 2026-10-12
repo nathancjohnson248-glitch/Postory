@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { KeyRound, ShieldCheck, Store, ThumbsUp } from "lucide-react";
 import { NetworkList } from "@/components/app/network-list";
+import { unavailablePlatforms } from "@/lib/social/availability";
 import { PageHeader } from "@/components/app/section";
 import { ConnectionReturnToast } from "@/components/onboarding/return-notices";
 import { requireAppAccess } from "@/lib/auth/access";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 export const metadata: Metadata = { title: "Connections" };
 
 const NOTES = [
-  { icon: KeyRound, title: "You sign in on the network itself", body: "Postory never sees your password. Bluesky is the one exception: it uses an app password you make in Bluesky's settings and can revoke any time." },
+  { icon: KeyRound, title: "You sign in on the network itself", body: "You approve access on the network's own screen, and Postory never sees your password. You can revoke access from the network at any time." },
   { icon: Store, title: "Business accounts for Meta", body: "Instagram needs a Business or Creator account, and Facebook posts go to a Page you manage, not a personal profile." },
   { icon: ThumbsUp, title: "Nothing posts on its own", body: "Connecting only lets Postory publish what you approve, when you press Publish or a time you set comes round." },
   { icon: ShieldCheck, title: "Disconnect whenever you like", body: "Your stories and posts stay in your library. To revoke access completely, remove Postory on the network's connected-apps page too." },
@@ -57,7 +58,7 @@ export default async function ConnectionsPage() {
       </dl>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <NetworkList rows={networks} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/app/connections" />
+        <NetworkList rows={networks} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/app/connections" unavailable={unavailablePlatforms()} />
 
         <aside className="flex flex-col gap-3 lg:sticky lg:top-10 lg:self-start">
           <h2 className="px-1 text-[13px] font-semibold text-ink-soft">Before you connect</h2>

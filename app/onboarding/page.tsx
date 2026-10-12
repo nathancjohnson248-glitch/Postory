@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { NetworkList } from "@/components/app/network-list";
+import { unavailablePlatforms } from "@/lib/social/availability";
 import { PlanCards } from "@/components/billing/plan-cards";
 import { TrialPicker } from "@/components/billing/trial-picker";
 import { StepRail } from "@/components/onboarding/step-rail";
@@ -119,7 +120,7 @@ async function SocialStep({ userId }: { userId: string }) {
   const connectedCount = rows.reduce((n, r) => n + r.accounts.filter((a) => a.status === "connected").length, 0);
   return (
     <div className="mx-auto max-w-2xl">
-      <NetworkList rows={rows} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/onboarding" />
+      <NetworkList rows={rows} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/onboarding" unavailable={unavailablePlatforms()} />
       <div className="mt-8 flex items-center justify-between">
         <BackButton to="voice" />
         <NextStepButton to="story" label={connectedCount ? "Continue" : "I'll connect later"} variant={connectedCount ? "primary" : "secondary"} />

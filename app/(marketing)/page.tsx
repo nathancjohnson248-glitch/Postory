@@ -6,6 +6,8 @@ import { PlanCards } from "@/components/billing/plan-cards";
 import { Compare } from "@/components/marketing/compare";
 import { NetworkOrbit } from "@/components/marketing/network-orbit";
 import { Faq } from "@/components/marketing/faq";
+import { FounderLine } from "@/components/marketing/founder-line";
+import { HeroConversation } from "@/components/marketing/hero-conversation";
 import {
   AnalyticsDemo,
   ApprovalDemo,
@@ -95,6 +97,7 @@ export default function HomePage() {
                 See Postory in action
               </Link>
             </div>
+            <HeroConversation className="fade-rise mt-12 sm:mt-14" />
           </div>
           <div id="product" className="stage-in mx-auto mt-12 max-w-6xl scroll-mt-24 sm:mt-16" style={{ animationDelay: "0.8s" }}>
             <HeroProduct />
@@ -178,13 +181,16 @@ export default function HomePage() {
               eyebrow="Every network"
               title={
                 <>
-                  One story. <em>Every network.</em>
+                  How one line becomes <em>a post for every network.</em>
                 </>
               }
               body="Each network has its own rhythm. Postory changes the structure, length and tone for each one — it doesn't reword the same paragraph. Ask for a change to one version and the others stay exactly as they are."
             />
           </Reveal>
-          <Reveal delay={0.1} className="mt-10 sm:mt-14">
+          <Reveal delay={0.05} className="mt-10 sm:mt-14">
+            <FounderLine />
+          </Reveal>
+          <Reveal delay={0.1} className="mt-5 sm:mt-6">
             <PlatformVersions />
           </Reveal>
         </div>

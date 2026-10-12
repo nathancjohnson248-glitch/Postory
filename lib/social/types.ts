@@ -30,6 +30,8 @@ export type PublishRequest = {
   idempotencyKey: string;
   /** Short-lived public URLs, for providers that fetch media themselves. */
   mediaUrls?: string[];
+  /** The provider's own name for the connected account type (e.g. Postiz "linkedin-page"). */
+  providerHint?: string;
 };
 
 export type ProviderPostStatus = "queued" | "validated" | "publishing" | "published" | "failed" | "rejected" | "canceled";
