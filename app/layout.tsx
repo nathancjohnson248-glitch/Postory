@@ -20,24 +20,23 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://postory.lol";
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
   title: {
-    default: "Postory — Your business doesn't stop. Neither should your social.",
+    default: "Postory - AI social media for founders who ship",
     template: "%s · Postory",
   },
   description:
-    "Tell Postory what happened in your business. It turns the moment into platform-native posts, waits for your approval, and keeps every network moving.",
+    "Tell Postory what happened in your business. Its AI finds the story, writes platform-native posts for every network, and prepares each one for your approval.",
   applicationName: "Postory",
   openGraph: {
     type: "website",
     siteName: "Postory",
     url: appUrl,
-    title: "Postory — Your business doesn't stop. Neither should your social.",
-    description:
-      "Social publishing for businesses. One story in, platform-native posts out — reviewed by you, published everywhere.",
+    title: "Postory - AI social media for founders who ship",
+    description: "Turn what happened into what gets posted. One story in, platform-native posts out — approved by you, published everywhere.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Postory",
-    description: "Your business doesn't stop. Neither should your social.",
+    title: "Postory - AI social media for founders who ship",
+    description: "Turn what happened into what gets posted.",
   },
 };
 

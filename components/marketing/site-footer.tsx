@@ -16,7 +16,7 @@ export function SiteFooter() {
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))]">
           <div>
             <Logo />
-            <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-muted">Your business doesn&apos;t stop. Neither should your social.</p>
+            <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-muted">AI social media for founders who ship. Tell it what happened — it writes the posts.</p>
           </div>
           {COLUMNS.map((col) => (
             <div key={col.title}>

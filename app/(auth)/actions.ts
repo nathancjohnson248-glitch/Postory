@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { authEmailMode, confirmWithoutEmail, createConfirmedAccount, resendSignupCode, sendPasswordResetCode, startSignupWithCode } from "@/lib/auth/email-codes";
+import { authEmailMode, confirmWithoutEmail, createConfirmedAccount, resendSignupCode, sendPasswordResetCode, signInWithVerifiedGoogle, startSignupWithCode } from "@/lib/auth/email-codes";
+import { verifyGoogleLogin } from "@/lib/auth/privy";
 import { requestOrigin } from "@/lib/auth/origin";
 import { clearPendingEmail, getPendingEmail, setPendingEmail } from "@/lib/auth/pending";
 import { sendWelcomeEmail } from "@/lib/email/welcome";
@@ -219,6 +220,26 @@ async function resendVerificationCodeInner(): Promise<AuthFormState> {
 // ---------------------------------------------------------------------------
 // Google
 // ---------------------------------------------------------------------------
+
+/**
+ * Last step of Google sign-in through Privy: the browser hands over its Privy
+ * access token; the server verifies it, reads the Google address with the app
+ * secret and opens the Supabase session for that address.
+ */
+export async function completeGoogleSignIn(accessToken: string, next: string): Promise<{ next: string } | { error: string }> {
+  if (typeof accessToken !== "string" || accessToken.length > 4096) return { error: GOOGLE_FAILED };
+  const identity = await verifyGoogleLogin(accessToken);
+  if (!identity) return { error: GOOGLE_FAILED };
+  const outcome = await signInWithVerifiedGoogle(identity);
+  if (outcome.status !== "signed_in") return { error: GOOGLE_FAILED };
+  if (outcome.created) {
+    sendWelcomeEmail({ email: identity.email, user_metadata: { full_name: identity.name } });
+    return { next: "/onboarding" };
+  }
+  return { next: safeNextPath.parse(next) };
+}
+
+const GOOGLE_FAILED = "Google sign-in didn't go through. Try again, or use your email instead.";
 
 export async function signInWithGoogle(formData: FormData) {
   const next = safeNextPath.parse(formData.get("next") ?? "/app");

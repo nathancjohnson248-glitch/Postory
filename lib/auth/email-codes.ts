@@ -6,6 +6,7 @@ import { env, integrations } from "@/lib/env";
 import { sendEmail } from "@/lib/email/send";
 import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Postory's own sign-in codes. When an email sender is configured (an SMTP
@@ -230,5 +231,49 @@ export async function confirmWithoutEmail(email: string): Promise<boolean> {
   } catch (error) {
     log.error("confirm without email failed", { operation: "auth.instant.confirm", provider: "supabase" }, error);
     return false;
+  }
+}
+
+export type GoogleSignInOutcome = { status: "signed_in"; created: boolean } | { status: "failed" };
+
+/**
+ * Open a Supabase session for an address Google has verified (through Privy).
+ * The account is keyed by email, so someone who signed up with a password
+ * gets the same account — nothing is orphaned. A new address gets a new,
+ * already-confirmed account. The session is minted with a one-time magic-link
+ * token that never leaves the server.
+ */
+export async function signInWithVerifiedGoogle(input: { email: string; name: string | null }): Promise<GoogleSignInOutcome> {
+  try {
+    const admin = createAdminClient();
+    const existing = await accountStatus(input.email);
+    let created = false;
+    if (!existing) {
+      const { error } = await admin.auth.admin.createUser({
+        email: input.email,
+        email_confirm: true,
+        user_metadata: input.name ? { full_name: input.name } : {},
+        app_metadata: { signup_method: "google" },
+      });
+      // A concurrent sign-in may have created it a moment ago.
+      if (error && error.code !== "email_exists" && error.code !== "user_already_exists") throw error;
+      created = !error;
+    } else if (!existing.confirmed) {
+      // Google just proved ownership of the address.
+      const { error } = await admin.auth.admin.updateUserById(existing.userId, { email_confirm: true });
+      if (error) throw error;
+    }
+
+    const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: input.email });
+    const tokenHash = data?.properties?.hashed_token;
+    if (error || !tokenHash) throw error ?? new Error("no token in generated link");
+
+    const supabase = await createClient();
+    const { error: verifyError } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash });
+    if (verifyError) throw verifyError;
+    return { status: "signed_in", created };
+  } catch (error) {
+    log.error("google sign-in failed", { operation: "auth.google.session", provider: "supabase" }, error);
+    return { status: "failed" };
   }
 }

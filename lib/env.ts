@@ -64,6 +64,10 @@ export const env = {
   authEmailCodes: () => read("AUTH_EMAIL_CODES") === "on",
   emailTestToken: () => read("EMAIL_TEST_TOKEN"),
 
+  // Google sign-in through Privy. The app id is public; the secret stays here.
+  privyAppId: () => read("PRIVY_APP_ID") ?? read("NEXT_PUBLIC_PRIVY_APP_ID"),
+  privyAppSecret: () => read("PRIVY_APP_SECRET"),
+
   devPlan: () => (process.env.NODE_ENV === "development" ? read("POSTORY_DEV_PLAN") : undefined),
 };
 
@@ -72,6 +76,7 @@ export const integrations = {
   supabaseAdmin: () => Boolean(env.supabaseUrl() && env.supabaseSecretKey()),
   letmepost: () => Boolean(env.letmepostApiKey()),
   publora: () => Boolean(env.publoraApiKey()),
+  privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
@@ -89,6 +94,7 @@ export function integrationStatus(): IntegrationStatus {
     supabaseAdmin: integrations.supabaseAdmin(),
     letmepost: integrations.letmepost(),
     publora: integrations.publora(),
+    privy: integrations.privy(),
     handypay: integrations.handypay(),
     openai: integrations.openai(),
     resend: integrations.resend(),

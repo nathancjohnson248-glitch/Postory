@@ -258,3 +258,12 @@
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes indeterminate {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}

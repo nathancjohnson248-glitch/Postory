@@ -27,13 +27,13 @@ function layout({ preheader, body, footerNote }: { preheader: string; body: stri
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid ${LINE};border-radius:20px;">
 <tr><td style="padding:28px 36px 22px 36px;border-bottom:1px solid ${LINE};">
-<a href="${ASSETS}" style="text-decoration:none;"><img src="${ASSETS}/brand/email-logo.png" width="100" height="28" alt="Postory" style="display:block;border:0;height:28px;width:100px;"></a>
+<a href="${ASSETS}" style="text-decoration:none;"><img src="${ASSETS}/brand/email-logo.png" width="98" height="28" alt="Postory" style="display:block;border:0;height:28px;width:98px;"></a>
 </td></tr>
 <tr><td style="padding:32px 36px 36px 36px;font-family:${FONT};color:${SOFT};font-size:16px;line-height:1.65;">
 ${body}
 </td></tr>
 <tr><td style="padding:20px 36px 26px 36px;border-top:1px solid ${LINE};font-family:${FONT};font-size:12.5px;line-height:1.6;color:${MUTED};">
-Postory · Your business doesn't stop. Neither should your social.<br>
+Postory · AI social media for founders who ship.<br>
 <a href="${ASSETS}" style="color:${MUTED};text-decoration:underline;">${site.domain}</a>${footerNote ? `<br><span style="color:#9c9ca4;">${escape(footerNote)}</span>` : ""}
 </td></tr>
 </table>
@@ -62,6 +62,19 @@ function founderSignature() {
 <td valign="middle" style="font-family:${FONT};font-size:14px;line-height:1.45;">
 <span style="font-weight:600;color:${INK};font-size:15px;">${escape(site.founder.name)}</span><br>
 <span style="color:${MUTED};">Founder, Postory · </span><a href="${site.founder.xUrl}" style="color:${BLUE};text-decoration:none;font-weight:600;">${escape(site.founder.xHandle)}</a>
+</td></tr></table>`;
+}
+
+/** The founder's public build log and direct lines, as a quiet card under the signature. */
+function buildingInPublic() {
+  const link = (href: string, label: string) => `<a href="${href}" style="color:${INK};text-decoration:none;font-weight:600;">${escape(label)}</a>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;"><tr><td style="padding:18px 20px;border-radius:14px;background:#f6f5f1;font-family:${FONT};font-size:14px;line-height:1.6;color:${SOFT};">
+<span style="display:block;margin-bottom:6px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">Building in public</span>
+I share what shipped, what broke and what's next on X — the good weeks and the messy ones. Follow along, or just say hi.
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr>
+<td style="padding-right:18px;font-size:13.5px;"><span style="color:${MUTED};">X&nbsp;</span>${link(site.founder.xUrl, site.founder.xHandle)}</td>
+<td style="font-size:13.5px;"><span style="color:${MUTED};">Email&nbsp;</span>${link(`mailto:${site.founder.email}`, site.founder.email)}</td>
+</tr></table>
 </td></tr></table>`;
 }
 
@@ -122,7 +135,12 @@ export const templates = {
         "",
         "Talk soon,",
         `${site.founder.name}`,
-        `Founder, Postory · ${site.founder.xHandle} on X`,
+        `Founder, Postory`,
+        "",
+        `P.S. I'm building Postory in public — what shipped, what broke, and what's next. Follow along on X: ${site.founder.xUrl}`,
+        "",
+        `X: ${site.founder.xHandle} (${site.founder.xUrl})`,
+        `Email: ${mail}`,
       ].join("\n"),
       html: layout({
         preheader: "Thanks for signing up — here's how Postory works, and how to reach me.",
@@ -134,7 +152,8 @@ export const templates = {
           button("Open Postory", `${site.url}/app`) +
           `<p style="margin:22px 0 0 0;">One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? Write to me at <a href="mailto:${mail}" style="color:${BLUE};text-decoration:none;font-weight:600;">${escape(mail)}</a> — I read every message myself.</p>` +
           `<p style="margin:22px 0 0 0;color:${INK};">Talk soon,</p>` +
-          founderSignature(),
+          founderSignature() +
+          buildingInPublic(),
       }),
     };
   },

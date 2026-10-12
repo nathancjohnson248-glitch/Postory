@@ -1,8 +1,10 @@
 import "server-only";
 
 import { env } from "@/lib/env";
+import { privyGoogleEnabled } from "./privy";
 
-type AuthSettings = { google: boolean; emailAutoconfirm: boolean; signupDisabled: boolean };
+/** google: how "Continue with Google" works, if it's offered at all. */
+type AuthSettings = { google: "privy" | "supabase" | null; emailAutoconfirm: boolean; signupDisabled: boolean };
 
 /**
  * Which sign-in methods the Supabase project actually has enabled, read from
@@ -10,6 +12,11 @@ type AuthSettings = { google: boolean; emailAutoconfirm: boolean; signupDisabled
  * fail. Cached for five minutes.
  */
 export async function getAuthSettings(): Promise<AuthSettings> {
+  const [supabase, privy] = await Promise.all([getSupabaseSettings(), privyGoogleEnabled()]);
+  return { ...supabase, google: privy ? "privy" : supabase.google ? "supabase" : null };
+}
+
+async function getSupabaseSettings() {
   const url = env.supabaseUrl();
   const key = env.supabasePublishableKey();
   const fallback = { google: false, emailAutoconfirm: false, signupDisabled: false };

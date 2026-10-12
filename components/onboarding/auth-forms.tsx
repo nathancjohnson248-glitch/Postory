@@ -19,7 +19,7 @@ import {
   type AuthFormState,
 } from "@/app/(auth)/actions";
 import { CodeInput } from "./code-input";
-import { GoogleSubmit } from "./google-button";
+import { GoogleLink, GoogleSubmit } from "./google-button";
 
 function Submit({ children }: { children: React.ReactNode }) {
   const { pending } = useFormStatus();
@@ -45,16 +45,20 @@ function ErrorNotice({ state }: { state: AuthFormState }) {
   return <Notice tone="danger" title={state.error} className="mb-5" />;
 }
 
-export function LoginForm({ next, initialError, google }: { next: string; initialError?: string; google: boolean }) {
+export function LoginForm({ next, initialError, google }: { next: string; initialError?: string; google: "privy" | "supabase" | null }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signIn, initialError ? { error: initialError } : undefined);
   return (
     <>
       {google ? (
         <>
-          <form action={signInWithGoogle}>
-            <input type="hidden" name="next" value={next} />
-            <GoogleSubmit label="Continue with Google" />
-          </form>
+          {google === "privy" ? (
+            <GoogleLink label="Continue with Google" next={next} />
+          ) : (
+            <form action={signInWithGoogle}>
+              <input type="hidden" name="next" value={next} />
+              <GoogleSubmit label="Continue with Google" />
+            </form>
+          )}
           <Divider />
         </>
       ) : null}
@@ -83,16 +87,20 @@ export function LoginForm({ next, initialError, google }: { next: string; initia
   );
 }
 
-export function SignupForm({ google }: { google: boolean }) {
+export function SignupForm({ google }: { google: "privy" | "supabase" | null }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signUp, undefined);
   return (
     <>
       {google ? (
         <>
-          <form action={signInWithGoogle}>
-            <input type="hidden" name="next" value="/onboarding" />
-            <GoogleSubmit label="Sign up with Google" />
-          </form>
+          {google === "privy" ? (
+            <GoogleLink label="Continue with Google" next="/onboarding" />
+          ) : (
+            <form action={signInWithGoogle}>
+              <input type="hidden" name="next" value="/onboarding" />
+              <GoogleSubmit label="Continue with Google" />
+            </form>
+          )}
           <Divider />
         </>
       ) : null}
