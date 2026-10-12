@@ -8,7 +8,8 @@ import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Postory's own sign-in codes. When Resend is configured, Postory asks the
+ * Postory's own sign-in codes. When an email sender is configured (an SMTP
+ * mailbox such as Zoho Mail, or Resend), Postory asks the
  * Auth admin API for a one-time code (no email is sent by Supabase) and
  * delivers it from Postory's address. The code is verified with the regular
  * `verifyOtp` call, so Supabase still owns the account and its session.
@@ -26,15 +27,15 @@ export type CodeOutcome =
   | { status: "failed" };
 
 export function postorySendsAuthEmail() {
-  return integrations.resend() && integrations.supabaseAdmin();
+  return integrations.email() && integrations.supabaseAdmin();
 }
 
 /**
  * How sign-up and password reset reach people:
- * - "codes": Postory emails a one-time code from its own address (Resend).
+ * - "codes": Postory emails a one-time code from its own address.
  * - "instant": no sender is configured yet, so accounts are created already
  *   confirmed and Supabase never emails anyone. Codes switch on by
- *   themselves as soon as Resend is configured.
+ *   themselves as soon as a sender is configured.
  * - "supabase": local development without a service key.
  */
 export type AuthEmailMode = "codes" | "instant" | "supabase";

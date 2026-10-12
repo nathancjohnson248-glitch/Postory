@@ -45,6 +45,13 @@ export const env = {
   resendApiKey: () => read("RESEND_API_KEY"),
   resendFromEmail: () => read("RESEND_FROM_EMAIL"),
 
+  // Any SMTP mailbox (e.g. Zoho Mail: smtp.zoho.com, 465). Used when Resend isn't set.
+  smtpHost: () => read("SMTP_HOST"),
+  smtpPort: () => Number(read("SMTP_PORT") ?? 465),
+  smtpUser: () => read("SMTP_USER"),
+  smtpPassword: () => read("SMTP_PASSWORD"),
+  smtpFrom: () => read("SMTP_FROM") ?? read("SMTP_USER"),
+
   devPlan: () => (process.env.NODE_ENV === "development" ? read("POSTORY_DEV_PLAN") : undefined),
 };
 
@@ -55,6 +62,9 @@ export const integrations = {
   handypay: () => Boolean(env.handypayApiKey()),
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
+  smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
+  /** Postory can send email from its own address (Resend or SMTP). */
+  email: () => integrations.resend() || integrations.smtp(),
 };
 
 export type IntegrationStatus = Record<keyof typeof integrations, boolean>;
@@ -67,5 +77,7 @@ export function integrationStatus(): IntegrationStatus {
     handypay: integrations.handypay(),
     openai: integrations.openai(),
     resend: integrations.resend(),
+    smtp: integrations.smtp(),
+    email: integrations.email(),
   };
 }
