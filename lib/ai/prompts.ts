@@ -149,7 +149,8 @@ export function imagePrompt(input: { story: string; post: string; suggestion: st
     `Context: ${input.story.slice(0, 600)}`,
     input.extra ? `Owner's direction: ${input.extra.slice(0, 400)}` : null,
     "Style: editorial, uncluttered, natural light, restrained colour.",
-    "Absolutely no text, letters, words, numbers, logos, watermarks or UI on screens or anywhere in the image. Do not depict identifiable real people or invent product details.",
+    "No people, faces, hands or bodies at all — show objects, places, products, light or abstract scenes instead.",
+    "Absolutely no text, letters, words, numbers, logos, watermarks or UI on screens or anywhere in the image. Do not invent product details.",
   ]
     .filter(Boolean)
     .join("\n");

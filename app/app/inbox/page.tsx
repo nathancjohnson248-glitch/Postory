@@ -61,7 +61,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader title="Inbox" description="Comments, replies and mentions that need you — in one short list." />
       <Notice tone="info" title="Nothing can arrive here yet." className="mb-6">
-        Postory&apos;s publishing provider (LetMePost) publishes posts but doesn&apos;t yet share comments, replies or messages back. The inbox is
+        Postory&apos;s publishing partner doesn&apos;t share comments, replies or messages back yet. The inbox is
         ready for when it does — until then it stays empty rather than showing anything made up.
       </Notice>
       <nav aria-label="Inbox categories" className="scrollbar-none -mx-1 mb-6 flex gap-1 overflow-x-auto px-1">

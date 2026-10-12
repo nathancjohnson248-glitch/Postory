@@ -32,6 +32,7 @@ const HEADINGS: Record<string, { title: string; body: string }> = {
   story: { title: "What happened recently?", body: "Tell Postory one thing that happened in your business. It will turn it into a native post for each network." },
   storyDone: { title: "Here's your first story.", body: "One moment, written for each network. Edit or approve anything — nothing goes out without you." },
   plan: { title: "Start your 3-day trial.", body: "Pick a plan to schedule and publish. You won't be charged until the trial ends, and you can cancel any time before then." },
+  planActive: { title: "You're in.", body: "Your plan is active. Open Postory and tell it what happened next." },
 };
 
 const EXAMPLES: Record<string, string[]> = {
@@ -65,7 +66,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const canSkipPlan = Boolean(adminRole) || !billingAvailability().checkout;
   const step = effectiveStep(profile, entitlements.active || canSkipPlan);
   const firstStory = step === "story" ? await loadFirstStory(user.id) : null;
-  const heading = HEADINGS[step === "story" && firstStory ? "storyDone" : step] ?? HEADINGS.about;
+  const headingKey = step === "story" && firstStory ? "storyDone" : step === "plan" && entitlements.active ? "planActive" : step;
+  const heading = HEADINGS[headingKey] ?? HEADINGS.about;
 
   return (
     <div className={step === "story" && firstStory ? "mx-auto max-w-5xl" : "mx-auto max-w-3xl"}>

@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         </ul>
         <p>We don&apos;t sell your personal information, and we don&apos;t use your content to advertise to you.</p>
         <h2>Service providers</h2>
-        <p>We rely on a small number of providers to operate Postory, each only for its purpose: Supabase (database, authentication and file storage), LetMePost (connecting accounts and publishing), HandyPay (subscriptions and payments), an AI model provider when you use AI writing features, Resend (email), and our hosting provider. When you use AI features, the relevant story text and business information are sent to the AI provider to produce your drafts.</p>
+        <p>We rely on a small number of providers to operate Postory, each only for its purpose: Supabase (database, authentication and file storage), Publora (connecting your social accounts, publishing and reading back post statistics), HandyPay (subscriptions and payments), Google Gemini and Groq (AI writing), Cloudflare Workers AI (AI images), Privy (Google sign-in), Zoho Mail (email) and Railway (hosting). When you use AI features, the relevant story text and business information are sent to the AI provider to produce your drafts; image requests contain a description of the image, not your account details.</p>
         <h2>Retention and deletion</h2>
         <p>Your content stays in Postory until you delete it or delete your account. Ending a trial or subscription, or disconnecting a social account, doesn&apos;t delete your content. Deleting your account permanently removes your profile, stories, posts, business memory, media and connections from Postory. Posts already published to social networks stay on those networks; remove them there if you wish.</p>
         <h2>Security</h2>

@@ -54,7 +54,7 @@ export default function FeaturesPage() {
       <section id="integrations" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-24 sm:px-8">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
           {[
-            ["Publishing", "Posts are published and scheduled through LetMePost, with preflight checks and idempotent requests so a retry never posts twice."],
+            ["Publishing", "Posts are published and scheduled through Postory's publishing partner, with checks before sending and idempotent requests so a retry never posts twice."],
             ["Billing", "Subscriptions run on HandyPay's hosted checkout. Card details never touch Postory."],
             ["Your data", "Stories, posts and memory live in a database where every row is locked to its owner. Delete your account and it's gone."],
           ].map(([t, b]) => (
