@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, CheckCheck, ImageIcon, MessageSquareText, PenLine } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCheck, ImageIcon, Mail, MessageSquareText, PenLine } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { PlanCards } from "@/components/billing/plan-cards";
+import { Compare } from "@/components/marketing/compare";
 import { Faq } from "@/components/marketing/faq";
 import {
   AnalyticsDemo,
@@ -328,8 +330,28 @@ export default function HomePage() {
         </Reveal>
       </section>
 
+      {/* Compare */}
+      <section className="bg-surface">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 px-5 py-20 sm:px-8 sm:py-28 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-14">
+          <Reveal>
+            <SectionIntro
+              eyebrow="Why Postory"
+              title={
+                <>
+                  Not a scheduler. <em>Not a chatbot.</em>
+                </>
+              }
+              body="A scheduler posts what you've already written. A chatbot writes whatever you ask, true or not. Postory does the part in between: it turns what actually happened into posts you'd be happy to put your name on — then gets them out."
+            />
+          </Reveal>
+          <Reveal delay={0.1}>
+            <Compare />
+          </Reveal>
+        </div>
+      </section>
+
       {/* Pricing */}
-      <section id="pricing" className="scroll-mt-20 bg-surface py-20 sm:py-28">
+      <section id="pricing" className="scroll-mt-20 py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <Reveal>
             <SectionIntro
@@ -363,7 +385,7 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="scroll-mt-20 py-20 sm:py-28">
+      <section id="faq" className="scroll-mt-20 bg-surface py-20 sm:py-28">
         <div className="mx-auto grid grid-cols-1 max-w-7xl gap-10 lg:gap-14 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
           <Reveal>
             <SectionIntro
@@ -388,6 +410,42 @@ export default function HomePage() {
             <Faq />
           </Reveal>
         </div>
+      </section>
+
+      {/* Founder note */}
+      <section className="mx-auto max-w-3xl px-5 pt-20 sm:px-8 sm:pt-28">
+        <Reveal>
+          <figure className="rounded-[28px] bg-surface p-7 shadow-soft ring-1 ring-line sm:p-10">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-blue-600">A note from the founder</p>
+            <blockquote className="mt-5 font-display text-[26px] leading-[1.3] tracking-[-0.01em] text-ink sm:text-[32px]">
+              “I built Postory because the moments worth sharing kept slipping by while I was busy building. Tell it what happened, and it does the
+              writing with you — never instead of you.”
+            </blockquote>
+            <figcaption className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
+              <span className="flex items-center gap-3">
+                <LogoMark variant="tile" className="size-11 rounded-xl" />
+                <span>
+                  <span className="block text-[15px] font-semibold">{site.founder.name}</span>
+                  <span className="block text-[13px] text-muted">Founder, Postory · building in public</span>
+                </span>
+              </span>
+              <span className="flex items-center gap-2">
+                <a
+                  href={site.founder.xUrl}
+                  className="inline-flex h-9 items-center rounded-full bg-wash px-3.5 text-[13px] font-medium text-ink-soft transition-colors hover:bg-ink hover:text-white"
+                >
+                  {site.founder.xHandle} on X
+                </a>
+                <a
+                  href={`mailto:${site.founder.email}`}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-wash px-3.5 text-[13px] font-medium text-ink-soft transition-colors hover:bg-ink hover:text-white"
+                >
+                  <Mail className="size-3.5" aria-hidden /> Email me
+                </a>
+              </span>
+            </figcaption>
+          </figure>
+        </Reveal>
       </section>
 
       {/* Final CTA */}

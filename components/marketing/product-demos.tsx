@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { Check, CheckCheck, Sparkles } from "lucide-react";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { LogoMark } from "@/components/brand/logo";
@@ -391,9 +391,17 @@ export function ImageDemo() {
   const reduce = useReducedMotion();
   const [ratio, setRatio] = useState<(typeof RATIOS)[number]["id"]>("4:5");
   const [made, setMade] = useState(Boolean(reduce));
+  const frame = useRef<HTMLDivElement>(null);
+  const inView = useInView(frame, { once: true, margin: "-120px" });
+  // Plays itself once it's on screen; the button is there to see it again.
+  useEffect(() => {
+    if (!inView || made) return;
+    const t = setTimeout(() => setMade(true), 1100);
+    return () => clearTimeout(t);
+  }, [inView, made]);
   const current = RATIOS.find((r) => r.id === ratio)!;
   return (
-    <div className="rounded-3xl bg-surface p-5 shadow-lift ring-1 ring-line sm:p-6">
+    <div ref={frame} className="rounded-3xl bg-surface p-5 shadow-lift ring-1 ring-line sm:p-6">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 text-[13px] font-semibold">
           <PlatformIcon platform="instagram" tile className="size-6 rounded-[7px]" />
@@ -424,12 +432,13 @@ export function ImageDemo() {
             </motion.div>
           ) : (
             <div className="absolute inset-0 grid place-items-center">
+              {inView ? <div className="skeleton absolute inset-0" aria-hidden /> : null}
               <button
                 type="button"
                 onClick={() => setMade(true)}
-                className="flex items-center gap-2 rounded-xl bg-surface px-4 py-2.5 text-[13.5px] font-medium shadow-soft ring-1 ring-line transition-all hover:-translate-y-0.5 hover:shadow-lift"
+                className="relative flex items-center gap-2 rounded-xl bg-surface px-4 py-2.5 text-[13.5px] font-medium shadow-soft ring-1 ring-line transition-all hover:-translate-y-0.5 hover:shadow-lift"
               >
-                <Sparkles className="size-4 text-blue-600" aria-hidden /> Create image
+                <Sparkles className={cn("size-4 text-blue-600", inView && "animate-pulse")} aria-hidden /> {inView ? "Creating image…" : "Create image"}
               </button>
             </div>
           )}
