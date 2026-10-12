@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, Inbox, Paperclip, PenSquare, RefreshCw, Reply, Send } from "lucide-react";
+import { ArrowLeft, Forward, Inbox, Paperclip, PenSquare, RefreshCw, Reply, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
-import { openMail, replyMail, sendMail } from "@/app/_actions/mail";
+import { forwardMailboxToMe, openMail, replyMail, sendMail } from "@/app/_actions/mail";
 import type { MailFolder, MailSummary } from "@/lib/email/zoho";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +32,18 @@ export function Mailbox({ folders, folderId, messages, address }: { folders: Mai
   const [draft, setDraft] = useState<Draft | null>(null);
   const [sending, startSend] = useTransition();
   const [refreshing, startRefresh] = useTransition();
+  const [forwarding, startForward] = useTransition();
+
+  function forward() {
+    startForward(async () => {
+      const result = await forwardMailboxToMe();
+      if (!result.ok) {
+        toast.error(result.error.message);
+        return;
+      }
+      toast.success(`Zoho sent a confirmation link to ${result.data.to}. Click it and mail to ${address} will land there too.`, { duration: 10_000 });
+    });
+  }
 
   async function show(message: MailSummary) {
     setOpen(message);
@@ -84,6 +96,9 @@ export function Mailbox({ folders, folderId, messages, address }: { folders: Mai
           ))}
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" loading={forwarding} onClick={forward} icon={<Forward className="size-3.5" />}>
+            Forward to my email
+          </Button>
           <Button size="sm" variant="ghost" loading={refreshing} onClick={() => startRefresh(() => router.refresh())} icon={<RefreshCw className="size-3.5" />}>
             Refresh
           </Button>

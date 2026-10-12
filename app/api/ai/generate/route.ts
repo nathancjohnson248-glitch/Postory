@@ -5,7 +5,8 @@ import { aiAvailable } from "@/lib/ai/client";
 import { factCorpus, loadBusinessContext } from "@/lib/ai/context";
 import { generatePosts } from "@/lib/ai/generate-posts";
 import { getSessionUser } from "@/lib/auth/session";
-import { consumeUsage, getEntitlements } from "@/lib/entitlements";
+import { consumePreviewGeneration, consumeUsage, getEntitlements } from "@/lib/entitlements";
+import { UserFacingError } from "@/lib/errors";
 import { log } from "@/lib/log";
 import { listConnectedAccounts } from "@/lib/social/service";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -14,8 +15,11 @@ import { CreateStorySchema, idSchema, platformSchema } from "@/lib/validation/sc
 
 export const maxDuration = 120;
 
+/** Onboarding's first story may run before a plan exists, on up to this many networks. */
+const PREVIEW_MAX_PLATFORMS = 4;
+
 const RequestSchema = z.union([
-  CreateStorySchema.extend({ storyId: z.undefined().optional() }),
+  CreateStorySchema.extend({ storyId: z.undefined().optional(), onboarding: z.boolean().optional() }),
   z.object({ storyId: idSchema, platforms: z.array(platformSchema).min(1).max(8) }),
 ]);
 
@@ -31,6 +35,12 @@ type Event =
  *   understanding → (model) writing → checking → saving → done
  * The story is saved before generation, so it survives an AI failure.
  */
+async function inOnboarding(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("profiles").select("onboarding_completed").eq("id", userId).maybeSingle();
+  return data?.onboarding_completed === false;
+}
+
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
   if (!user) return Response.json({ error: { code: "unauthenticated", message: "Log in again." } }, { status: 401 });
@@ -84,9 +94,13 @@ export async function POST(request: NextRequest) {
         }
         send({ type: "story", storyId });
 
-        // 2. Check plan + reserve a generation.
+        // 2. Check plan + reserve a generation. Onboarding gets a small preview allowance.
         send({ type: "stage", stage: "understanding" });
-        const usage = await consumeUsage(user.id, entitlements, "ai_generation");
+        const preview = !entitlements.active && "onboarding" in body && body.onboarding === true && (await inOnboarding(user.id));
+        if (preview && platforms.length > PREVIEW_MAX_PLATFORMS) {
+          throw new UserFacingError("too_many_networks", `Pick up to ${PREVIEW_MAX_PLATFORMS} networks for your first story.`);
+        }
+        const usage = preview ? await consumePreviewGeneration(user.id) : await consumeUsage(user.id, entitlements, "ai_generation");
         release = usage.release;
         await supabase.from("stories").update({ status: "processing" }).eq("id", storyId);
         const context = await loadBusinessContext(user.id);

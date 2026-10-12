@@ -85,9 +85,53 @@ async function claimSend(email: string, purpose: "signup" | "recovery") {
   return row?.allowed ? { ok: true as const } : { ok: false as const, retryAfter: row?.retry_after_seconds ?? 60 };
 }
 
-async function deliver(email: string, template: "signupCode" | "resetCode", code: string): Promise<CodeOutcome> {
+async function deliver(email: string, template: "signupCode" | "resetCode" | "loginCode", code: string): Promise<CodeOutcome> {
   const result = await sendEmail(email, template, { code });
   return result.sent ? { status: "sent", codeLength: code.length } : { status: "failed" };
+}
+
+export type EmailCodeOutcome =
+  | { status: "sent"; codeLength: number; fresh: boolean }
+  | { status: "throttled"; retryAfter: number }
+  | { status: "failed" };
+
+/**
+ * Passwordless sign-in and sign-up: one code by email, either way.
+ * - A confirmed account gets a login code.
+ * - A new address gets a fresh, unconfirmed account and a confirmation code;
+ *   entering the code confirms it.
+ * - An unconfirmed leftover is started over first, so nothing set by whoever
+ *   created it (a password, a name) survives the real owner confirming.
+ * Codes are recovery-token OTPs, which `verifyOtp({ type: "email" })`
+ * accepts for both cases.
+ */
+export async function sendEmailCode(email: string): Promise<EmailCodeOutcome> {
+  try {
+    const existing = await accountStatus(email);
+    const claim = await claimSend(email, "signup");
+    if (!claim.ok) return { status: "throttled", retryAfter: claim.retryAfter };
+
+    const admin = createAdminClient();
+    const fresh = !existing?.confirmed;
+    if (existing && !existing.confirmed) {
+      const { error } = await admin.auth.admin.deleteUser(existing.userId);
+      if (error) throw error;
+    }
+    if (fresh) {
+      const { error } = await admin.auth.admin.createUser({ email, email_confirm: false, app_metadata: { signup_method: "email_code" } });
+      if (error && error.code !== "email_exists" && error.code !== "user_already_exists") throw error;
+    }
+
+    const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email });
+    if (error) throw error;
+    const code = data.properties?.email_otp;
+    if (!code) throw new Error("Auth returned no code");
+    const sent = await deliver(email, fresh ? "signupCode" : "loginCode", code);
+    return sent.status === "sent" ? { status: "sent", codeLength: sent.codeLength, fresh } : { status: "failed" };
+  } catch (error) {
+    log.error("email code failed", { operation: "auth.codes.email", provider: "supabase" }, error);
+    return { status: "failed" };
+  }
 }
 
 /**

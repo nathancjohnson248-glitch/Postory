@@ -1,7 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { authEmailMode, confirmWithoutEmail, createConfirmedAccount, resendSignupCode, sendPasswordResetCode, signInWithVerifiedGoogle, startSignupWithCode } from "@/lib/auth/email-codes";
+import {
+  authEmailMode,
+  confirmWithoutEmail,
+  createConfirmedAccount,
+  resendSignupCode,
+  sendEmailCode,
+  sendPasswordResetCode,
+  signInWithVerifiedGoogle,
+  startSignupWithCode,
+} from "@/lib/auth/email-codes";
 import { verifyGoogleLogin } from "@/lib/auth/privy";
 import { requestOrigin } from "@/lib/auth/origin";
 import { clearPendingEmail, getPendingEmail, setPendingEmail } from "@/lib/auth/pending";
@@ -173,6 +182,29 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
   redirect("/verify");
 }
 
+/**
+ * Passwordless: email → 6-digit code, for new and returning people alike.
+ * Only offered when Postory sends its own email ("codes" mode).
+ */
+export async function requestEmailCode(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const raw = String(formData.get("email") ?? "");
+  const parsed = emailSchema.safeParse(raw);
+  if (!parsed.success) return { error: firstError(parsed.error), email: raw };
+  const email = parsed.data;
+  if (authEmailMode() !== "codes") return { error: "Email codes aren't available right now. Log in with your password instead.", email };
+
+  const outcome = await sendEmailCode(email);
+  if (outcome.status === "throttled") {
+    // A code went out moments ago (a double submit): use that one.
+    const pending = await getPendingEmail("verify");
+    if (pending?.email === email) redirect("/verify");
+    return { error: waitMessage(outcome.retryAfter), email, retryAfter: Math.min(outcome.retryAfter, 3600) };
+  }
+  if (outcome.status !== "sent") return { error: SEND_FAILED, email };
+  await setPendingEmail("verify", email, outcome.codeLength, outcome.fresh);
+  redirect("/verify");
+}
+
 export async function verifySignupCode(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const pending = await getPendingEmail("verify");
   if (!pending) return { error: "This sign-up has timed out. Start again or log in.", attempt: Date.now() };
@@ -180,11 +212,14 @@ export async function verifySignupCode(_prev: AuthFormState, formData: FormData)
   if (!code.success) return { error: firstError(code.error), attempt: Date.now() };
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "email" });
+  let { data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "email" });
+  // Login codes are recovery tokens; accept them on the recovery path too.
+  if (error && !pending.fresh) ({ data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "recovery" }));
   if (error) return { error: friendlyAuthError(error), attempt: Date.now() };
 
-  sendWelcomeEmail(data.user);
   await clearPendingEmail("verify");
+  if (!pending.fresh) redirect("/app");
+  sendWelcomeEmail(data.user);
   redirect("/onboarding");
 }
 
@@ -194,6 +229,15 @@ async function resendVerificationCodeInner(): Promise<AuthFormState> {
 
   const mode = authEmailMode();
   if (mode === "instant") return { error: "No code is needed right now — log in with your email and password." };
+  if (mode === "codes" && !pending.fresh) {
+    const outcome = await sendEmailCode(pending.email);
+    if (outcome.status === "sent") {
+      await setPendingEmail("verify", pending.email, outcome.codeLength, outcome.fresh);
+      return { notice: `New code sent to ${pending.email}.`, retryAfter: 60 };
+    }
+    if (outcome.status === "throttled") return { error: waitMessage(outcome.retryAfter), retryAfter: Math.min(outcome.retryAfter, 3600) };
+    return { error: SEND_FAILED };
+  }
   if (mode === "codes") {
     const outcome = await resendSignupCode(pending.email);
     switch (outcome.status) {

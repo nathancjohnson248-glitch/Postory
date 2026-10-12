@@ -36,7 +36,7 @@ export function ManageBillingButton() {
   const [pending, start] = useTransition();
   return (
     <Button
-      variant="secondary"
+      variant="accent"
       icon={<ExternalLink className="size-4" />}
       loading={pending}
       onClick={() =>
@@ -47,7 +47,7 @@ export function ManageBillingButton() {
         })
       }
     >
-      Manage subscription
+      Manage billing
     </Button>
   );
 }

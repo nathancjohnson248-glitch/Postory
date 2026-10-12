@@ -70,7 +70,7 @@ function buildingInPublic() {
   const link = (href: string, label: string) => `<a href="${href}" style="color:${INK};text-decoration:none;font-weight:600;">${escape(label)}</a>`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:28px;"><tr><td style="padding:18px 20px;border-radius:14px;background:#f6f5f1;font-family:${FONT};font-size:14px;line-height:1.6;color:${SOFT};">
 <span style="display:block;margin-bottom:6px;font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">Building in public</span>
-I share what shipped, what broke and what's next on X — the good weeks and the messy ones. Follow along, or just say hi.
+I share what shipped, what broke and what's next on <a href="${site.founder.xUrl}" style="color:${INK};font-weight:600;text-decoration:underline;">X</a> — the good weeks and the messy ones. Follow along, or just say hi.
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr>
 <td style="padding-right:18px;font-size:13.5px;"><span style="color:${MUTED};">X&nbsp;</span>${link(site.founder.xUrl, site.founder.xHandle)}</td>
 <td style="font-size:13.5px;"><span style="color:${MUTED};">Email&nbsp;</span>${link(`mailto:${site.founder.email}`, site.founder.email)}</td>
@@ -101,6 +101,20 @@ export const templates = {
     }),
   }),
 
+  loginCode: (input: { code: string }) => ({
+    subject: `${input.code} is your Postory login code`,
+    text: `Your Postory login code is ${input.code}. It expires in an hour. If you didn't try to log in, you can ignore this email — nobody can get in without the code.`,
+    html: layout({
+      preheader: `Your login code is ${input.code}.`,
+      footerNote: "You're receiving this because someone asked to log in to Postory with this address.",
+      body:
+        h1("Your login code") +
+        p("Enter this code on the log-in page to open Postory.") +
+        codeBlock(input.code) +
+        small("It expires in an hour. If you didn't try to log in, ignore this email — nobody can get in without the code."),
+    }),
+  }),
+
   resetCode: (input: { code: string }) => ({
     subject: `${input.code} is your Postory reset code`,
     text: `Your Postory password reset code is ${input.code}. It expires in an hour. If you didn't ask to reset your password, you can ignore this email.`,
@@ -121,7 +135,7 @@ export const templates = {
     return {
       subject: "Welcome to Postory — a quick note from Nathan",
       text: [
-        `Hi${first ? ` ${first}` : ""},`,
+        `Hi ${first ?? "there"},`,
         "",
         "Thanks for signing up — really glad you're here.",
         "",
@@ -131,7 +145,7 @@ export const templates = {
         "",
         `Open Postory: ${site.url}/app`,
         "",
-        `One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? Write to me at ${mail} — I read every message myself.`,
+        `One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? Just reply to this email (or write to ${mail}) — I read every message myself.`,
         "",
         "Talk soon,",
         `${site.founder.name}`,
@@ -145,12 +159,12 @@ export const templates = {
       html: layout({
         preheader: "Thanks for signing up — here's how Postory works, and how to reach me.",
         body:
-          `<p style="margin:0 0 16px 0;color:${INK};">Hi${first ? ` ${escape(first)}` : ""},</p>` +
+          `<p style="margin:0 0 16px 0;color:${INK};">Hi ${escape(first ?? "there")},</p>` +
           `<p style="margin:0 0 20px 0;font-size:20px;line-height:1.4;font-weight:600;letter-spacing:-0.015em;color:${INK};">Thanks for signing up — really glad you're here.</p>` +
           p("I'm Nathan, and I built Postory for a simple reason: the businesses doing the most interesting work are often the ones posting the least. There's always something more urgent than rewriting the same update for five different apps.") +
           p("So Postory works the other way round. You tell it what happened — a launch, a new hire, a milestone, something you learned — and it shapes that one story into a post for each network you use. Nothing goes out until you've read it and said yes.") +
           button("Open Postory", `${site.url}/app`) +
-          `<p style="margin:22px 0 0 0;">One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? Write to me at <a href="mailto:${mail}" style="color:${BLUE};text-decoration:none;font-weight:600;">${escape(mail)}</a> — I read every message myself.</p>` +
+          `<p style="margin:22px 0 0 0;">One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? <strong style="color:${INK};font-weight:600;">Just reply to this email</strong> (or write to <a href="mailto:${mail}" style="color:${BLUE};text-decoration:none;font-weight:600;">${escape(mail)}</a>) — I read every message myself.</p>` +
           `<p style="margin:22px 0 0 0;color:${INK};">Talk soon,</p>` +
           founderSignature() +
           buildingInPublic(),

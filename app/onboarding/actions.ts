@@ -4,9 +4,10 @@ import { redirect } from "next/navigation";
 import { getProfile, requireUser } from "@/lib/auth/session";
 import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
-import { BusinessSchema, VoiceSchema, fieldErrors } from "@/lib/validation/schemas";
+import { AboutSchema, BusinessSchema, VoiceSchema, fieldErrors } from "@/lib/validation/schemas";
 
-const STEPS = ["business", "social", "voice", "plan", "finish"] as const;
+/** about → business → voice → social → story → plan. "finish" is a legacy alias of plan. */
+const STEPS = ["about", "business", "voice", "social", "story", "plan", "finish"] as const;
 type Step = (typeof STEPS)[number];
 
 export type StepFormState = { errors?: Record<string, string>; error?: string } | undefined;
@@ -19,6 +20,23 @@ async function setStep(userId: string, step: Step) {
     .eq("id", userId)
     .eq("onboarding_completed", false);
   if (error) throw new Error("Could not save your progress.");
+}
+
+export async function saveAbout(_prev: StepFormState, formData: FormData): Promise<StepFormState> {
+  const user = await requireUser();
+  const parsed = AboutSchema.safeParse({ name: formData.get("name"), businessType: formData.get("businessType") });
+  if (!parsed.success) return { errors: fieldErrors(parsed.error) };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({ name: parsed.data.name, business_type: parsed.data.businessType, onboarding_step: "business" })
+    .eq("id", user.id)
+    .eq("onboarding_completed", false);
+  if (error) {
+    log.error("save about failed", { operation: "onboarding.saveAbout", userId: user.id }, error);
+    return { error: "We couldn't save that. Try again." };
+  }
+  redirect("/onboarding");
 }
 
 export async function saveBusiness(_prev: StepFormState, formData: FormData): Promise<StepFormState> {
@@ -41,7 +59,7 @@ export async function saveBusiness(_prev: StepFormState, formData: FormData): Pr
       business_type: parsed.data.businessType,
       website_url: parsed.data.websiteUrl,
       timezone: parsed.data.timezone,
-      onboarding_step: "social",
+      onboarding_step: "voice",
     })
     .eq("id", user.id)
     .eq("onboarding_completed", false);
@@ -77,7 +95,7 @@ export async function saveVoice(_prev: StepFormState, formData: FormData): Promi
       return { error: "We couldn't save your voice settings. Try again." };
     }
   }
-  await setStep(user.id, "plan");
+  await setStep(user.id, "social");
   redirect("/onboarding");
 }
 
@@ -87,12 +105,11 @@ export async function goToStep(step: string) {
   const profile = await getProfile(user.id);
   if (!profile || profile.onboarding_completed) redirect("/app");
   const target = step as Step;
-  // Moving forward past the business step requires the business details.
-  if (target !== "business" && !profile.business_name) {
-    await setStep(user.id, "business");
-  } else {
-    await setStep(user.id, target);
-  }
+  // Each step needs the ones before it: a business type, then the business details.
+  const order = STEPS.indexOf(target);
+  if (order > STEPS.indexOf("about") && !profile.business_type) await setStep(user.id, "about");
+  else if (order > STEPS.indexOf("business") && !profile.business_name) await setStep(user.id, "business");
+  else await setStep(user.id, target);
   redirect("/onboarding");
 }
 
@@ -103,13 +120,11 @@ export async function goToStep(step: string) {
 export async function completeOnboarding() {
   const user = await requireUser();
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("profiles")
     .update({ onboarding_completed: true, onboarding_step: "finish", onboarding_completed_at: new Date().toISOString() })
     .eq("id", user.id)
-    .eq("onboarding_completed", false)
-    .select("name,email,business_name")
-    .maybeSingle();
+    .eq("onboarding_completed", false);
   if (error) {
     log.error("complete onboarding failed", { operation: "onboarding.complete", userId: user.id }, error);
     throw new Error("We couldn't finish setup. Try again.");

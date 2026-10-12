@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAdminRole } from "@/lib/auth/admin";
 import { integrations } from "@/lib/env";
-import { getMessageContent, markRead, replyToMessage, sendViaZoho, ZohoScopeError } from "@/lib/email/zoho";
+import { addMailForward, getMessageContent, markRead, replyToMessage, sendViaZoho, ZohoScopeError } from "@/lib/email/zoho";
 import { UserFacingError } from "@/lib/errors";
 import { runAction } from "./_run";
 
@@ -79,5 +79,22 @@ export async function replyMail(input: { messageId: string; to: string; subject:
     }
     revalidatePath("/app/admin/mail");
     return null;
+  });
+}
+
+/** Forward the mailbox to the owner's own sign-in address — never anywhere else. */
+export async function forwardMailboxToMe() {
+  return runAction("mail.forward", async (user) => {
+    await assertOwner(user);
+    if (!user.email) throw new UserFacingError("no_email", "Your account has no email address.");
+    try {
+      await addMailForward(user.email);
+    } catch (error) {
+      if (error instanceof ZohoScopeError) {
+        throw new UserFacingError("mail_scope", "Zoho needs one more permission (ZohoMail.accounts.UPDATE). Add it to the Zoho connection, or turn on forwarding in Zoho Mail → Settings → Mail Forwarding.");
+      }
+      throw error;
+    }
+    return { to: user.email };
   });
 }

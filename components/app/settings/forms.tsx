@@ -109,6 +109,7 @@ export function BusinessForm(props: { businessName: string; businessDescription:
       </Field>
       <Field label="Business type" htmlFor="b-type">
         <Select id="b-type" name="businessType" defaultValue={props.businessType || BUSINESS_TYPES[0]}>
+          {props.businessType && !(BUSINESS_TYPES as readonly string[]).includes(props.businessType) ? <option>{props.businessType}</option> : null}
           {BUSINESS_TYPES.map((t) => (
             <option key={t}>{t}</option>
           ))}

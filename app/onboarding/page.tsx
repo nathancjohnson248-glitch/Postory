@@ -6,14 +6,16 @@ import { NetworkList } from "@/components/app/network-list";
 import { PlanCards } from "@/components/billing/plan-cards";
 import { PlanPicker } from "@/components/billing/plan-picker";
 import { StepRail } from "@/components/onboarding/step-rail";
-import { BackButton, BusinessStep, FinishButton, NextStepButton, VoiceStep } from "@/components/onboarding/steps";
+import { FirstStoryComposer, FirstStoryResults, type FirstStory } from "@/components/onboarding/first-story";
+import { AboutStep, BackButton, BusinessStep, FinishButton, NextStepButton, VoiceStep } from "@/components/onboarding/steps";
 import { CheckoutReturnNotice, ConnectionReturnToast } from "@/components/onboarding/return-notices";
 import { Notice } from "@/components/ui/notice";
 import { getAdminRole } from "@/lib/auth/admin";
 import { getProfile, requireUser } from "@/lib/auth/session";
 import { billingAvailability, getSubscriptionRow } from "@/lib/billing/service";
 import { PLANS } from "@/lib/billing/plans";
-import { getEntitlements } from "@/lib/entitlements";
+import { getEntitlements, previewGenerationsLeft } from "@/lib/entitlements";
+import { isPlatform, type Platform } from "@/lib/social/platforms";
 import { getNetworkStates } from "@/lib/data/social";
 import { getSocialReadiness } from "@/lib/social/service";
 import { createClient } from "@/lib/supabase/server";
@@ -22,15 +24,33 @@ import { firstName } from "@/lib/utils";
 export const metadata: Metadata = { title: "Set up Postory" };
 
 const HEADINGS: Record<string, { title: string; body: string }> = {
-  business: { title: "Tell us about the business.", body: "Postory writes from what you tell it — nothing invented. Start with the basics." },
-  social: { title: "Connect your social accounts.", body: "Postory publishes only to accounts you connect, and only after you approve each post." },
-  voice: { title: "How should Postory sound?", body: "Optional. This shapes every post. You can change it any time in Settings." },
-  plan: {
-    title: "Start your 3-day trial.",
-    body: "Every plan includes the approval workflow, calendar and business memory. You won't be charged until the trial ends, and you can cancel before then.",
-  },
-  finish: { title: "You're set.", body: "Tell Postory what's happening in your business and it will turn it into posts for your review." },
+  about: { title: "What are you building?", body: "Pick the closest fit. It shapes which moments Postory treats as worth posting." },
+  business: { title: "Tell Postory about the business.", body: "A few lines in your own words. Postory writes from what you tell it — nothing invented." },
+  voice: { title: "How should you sound?", body: "This shapes every post. You can change it any time in Settings." },
+  social: { title: "Where do you post?", body: "Connect the accounts Postory should prepare posts for. Nothing is ever published without your approval." },
+  story: { title: "What happened recently?", body: "Tell Postory one thing that happened in your business. It will turn it into a native post for each network." },
+  storyDone: { title: "Here's your first story.", body: "One moment, written for each network. Edit or approve anything — nothing goes out without you." },
+  plan: { title: "Start your 3-day trial.", body: "Pick a plan to schedule and publish. You won't be charged until the trial ends, and you can cancel any time before then." },
 };
+
+const EXAMPLES: Record<string, string[]> = {
+  "Indie founder or startup": ["We shipped dark mode after 40 people asked for it.", "Our first paying customer signed up today."],
+  "Creator or personal brand": ["I just passed 1,000 newsletter subscribers.", "I learned something surprising filming this week's video."],
+  "Online business": ["Our autumn collection is back in stock.", "A customer sent us a photo of their order in use."],
+  "Local business": ["We're open late this Friday for a tasting night.", "New pastries on the counter this morning."],
+  "Agency or studio": ["We launched a new website for a local bakery.", "We wrapped a brand refresh for a client this week."],
+  "Professional service": ["A client asked a question I get every week — here's my answer.", "I'm speaking at a local business meetup next month."],
+};
+
+/** The step to show, mapped from what's actually saved. */
+function effectiveStep(profile: { onboarding_step: string; business_type: string | null; business_name: string | null }, activePlanOrSkip: boolean) {
+  let step = profile.onboarding_step;
+  if (!profile.business_type && step !== "about") step = "about";
+  else if (step === "finish") step = "plan";
+  else if (!profile.business_name && !["about", "business"].includes(step)) step = "business";
+  if (step === "plan" && activePlanOrSkip) return "plan";
+  return step;
+}
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
@@ -42,11 +62,12 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   // Postory opens once a trial has started. Staff, and deployments without
   // billing, may continue without one.
   const canSkipPlan = Boolean(adminRole) || !billingAvailability().checkout;
-  const step = profile.onboarding_step === "finish" && !entitlements.active && !canSkipPlan ? "plan" : profile.onboarding_step;
-  const heading = HEADINGS[step] ?? HEADINGS.business;
+  const step = effectiveStep(profile, entitlements.active || canSkipPlan);
+  const firstStory = step === "story" ? await loadFirstStory(user.id) : null;
+  const heading = HEADINGS[step === "story" && firstStory ? "storyDone" : step] ?? HEADINGS.about;
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className={step === "story" && firstStory ? "mx-auto max-w-5xl" : "mx-auto max-w-3xl"}>
       <Suspense>
         <ConnectionReturnToast />
       </Suspense>
@@ -54,14 +75,14 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <StepRail current={step} />
       </div>
       <div className="mt-8 mb-10 text-center">
-        {step === "business" && firstName(profile.name) ? (
-          <p className="mb-3 text-sm text-muted">Hi {firstName(profile.name)} — let&apos;s get your workspace ready.</p>
-        ) : null}
+        {step === "business" && firstName(profile.name) ? <p className="mb-3 text-sm text-muted">Nice to meet you, {firstName(profile.name)}.</p> : null}
         <h1 className="font-display text-[44px] leading-[1.02] tracking-[-0.02em] text-balance sm:text-[56px]">{heading.title}</h1>
         <p className="mx-auto mt-4 max-w-lg text-[15px] leading-relaxed text-muted text-pretty">{heading.body}</p>
       </div>
 
       <div>
+        {step === "about" ? <AboutStep defaults={{ name: profile.name ?? "", businessType: profile.business_type ?? "" }} /> : null}
+
         {step === "business" ? (
           <div className="mx-auto max-w-xl rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line sm:p-8">
             <BusinessStep
@@ -77,8 +98,14 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
         {step === "social" ? <SocialStep userId={user.id} /> : null}
         {step === "voice" ? <VoiceStepLoader userId={user.id} /> : null}
+        {step === "story" ? (
+          firstStory ? (
+            <FirstStoryResults story={firstStory} authorName={profile.business_name || profile.name || "You"} previewLeft={await previewGenerationsLeft(user.id)} />
+          ) : (
+            <StoryStep userId={user.id} businessType={profile.business_type} />
+          )
+        ) : null}
         {step === "plan" ? <PlanStep userId={user.id} checkoutParam={params.checkout} eventParam={params.billing} canSkip={canSkipPlan} /> : null}
-        {step === "finish" ? <FinishStep userId={user.id} /> : null}
       </div>
     </div>
   );
@@ -91,8 +118,8 @@ async function SocialStep({ userId }: { userId: string }) {
     <div className="mx-auto max-w-2xl">
       <NetworkList rows={rows} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/onboarding" />
       <div className="mt-8 flex items-center justify-between">
-        <BackButton to="business" />
-        <NextStepButton to="voice" label={connectedCount ? "Continue" : "Skip for now"} variant={connectedCount ? "primary" : "secondary"} />
+        <BackButton to="voice" />
+        <NextStepButton to="story" label={connectedCount ? "Continue" : "I'll connect later"} variant={connectedCount ? "primary" : "secondary"} />
       </div>
     </div>
   );
@@ -134,9 +161,8 @@ async function PlanStep({ userId, checkoutParam, eventParam, canSkip }: { userId
             </p>
           </div>
         </div>
-        <div className="mt-8 flex items-center justify-between">
-          <BackButton to="voice" />
-          <NextStepButton to="finish" />
+        <div className="mt-8 flex justify-end">
+          <FinishButton />
         </div>
       </div>
     );
@@ -166,39 +192,45 @@ async function PlanStep({ userId, checkoutParam, eventParam, canSkip }: { userId
         </>
       )}
       <div className="mx-auto mt-10 flex max-w-2xl items-center justify-between">
-        <BackButton to="voice" />
-        {canSkip ? <NextStepButton to="finish" label="Continue without a plan" variant="ghost" /> : null}
+        <BackButton to="story" />
+        {canSkip ? <FinishButton label="Continue without a plan" variant="ghost" /> : null}
       </div>
     </div>
   );
 }
 
-async function FinishStep({ userId }: { userId: string }) {
-  const [rows, entitlements] = await Promise.all([getNetworkStates(userId), getEntitlements(userId)]);
-  const connected = rows.flatMap((r) => r.accounts.filter((a) => a.status === "connected").map(() => r.platform));
-  return (
-    <div className="mx-auto max-w-xl">
-      <ul className="divide-y divide-line rounded-3xl bg-surface shadow-soft ring-1 ring-line">
-        <li className="flex items-center justify-between px-6 py-4 text-sm">
-          <span className="text-muted">Business profile</span>
-          <span className="font-medium">Saved</span>
-        </li>
-        <li className="flex items-center justify-between px-6 py-4 text-sm">
-          <span className="text-muted">Connected accounts</span>
-          <span className="font-medium">{connected.length ? connected.length : "None yet"}</span>
-        </li>
-        <li className="flex items-center justify-between px-6 py-4 text-sm">
-          <span className="text-muted">Plan</span>
-          <span className="font-medium">{entitlements.active && entitlements.plan ? PLANS[entitlements.plan].name : "Not chosen yet"}</span>
-        </li>
-      </ul>
-      {!entitlements.active ? (
-        <p className="mt-4 text-center text-sm text-muted">Generating and publishing posts needs a plan — you can start a trial from Billing.</p>
-      ) : null}
-      <div className="mt-8 flex items-center justify-between">
-        <BackButton to="plan" />
-        <FinishButton />
-      </div>
-    </div>
-  );
+async function StoryStep({ userId, businessType }: { userId: string; businessType: string | null }) {
+  const [rows, previewLeft] = await Promise.all([getNetworkStates(userId), previewGenerationsLeft(userId)]);
+  const connected = [...new Set(rows.filter((r) => r.accounts.some((a) => a.status === "connected")).map((r) => r.platform))].filter(isPlatform);
+  const defaults: Platform[] = connected.length ? connected : ["x", "linkedin", "instagram"];
+  return <FirstStoryComposer defaultPlatforms={defaults} previewLeft={previewLeft} examples={EXAMPLES[businessType ?? ""] ?? []} />;
+}
+
+/** The story written during onboarding, if there is one yet. */
+async function loadFirstStory(userId: string): Promise<FirstStory | null> {
+  const supabase = await createClient();
+  const { data: story } = await supabase
+    .from("stories")
+    .select("id,title,summary,angles")
+    .eq("user_id", userId)
+    .eq("status", "ready")
+    .is("archived_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!story) return null;
+  const { data: posts } = await supabase
+    .from("story_posts")
+    .select("id,platform,content,status,version,angle")
+    .eq("story_id", story.id)
+    .order("created_at", { ascending: true });
+  if (!posts?.length) return null;
+  const angles = (story.angles as { angles?: unknown } | null)?.angles;
+  return {
+    id: story.id,
+    title: story.title,
+    summary: story.summary,
+    angles: Array.isArray(angles) ? angles.filter((a): a is string => typeof a === "string") : [],
+    posts: posts.filter((p) => isPlatform(p.platform)).map((p) => ({ ...p, platform: p.platform as Platform })),
+  };
 }

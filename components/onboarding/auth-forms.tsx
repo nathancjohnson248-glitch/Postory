@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
+import { ArrowRight, KeyRound, Mail } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
 import {
+  requestEmailCode,
   requestPasswordReset,
   resendResetCode,
   resendVerificationCode,
@@ -45,23 +47,46 @@ function ErrorNotice({ state }: { state: AuthFormState }) {
   return <Notice tone="danger" title={state.error} className="mb-5" />;
 }
 
-export function LoginForm({ next, initialError, google }: { next: string; initialError?: string; google: "privy" | "supabase" | null }) {
+function GoogleChoice({ google, next }: { google: "privy" | "supabase" | null; next: string }) {
+  if (!google) return null;
+  return (
+    <>
+      {google === "privy" ? (
+        <GoogleLink label="Continue with Google" next={next} />
+      ) : (
+        <form action={signInWithGoogle}>
+          <input type="hidden" name="next" value={next} />
+          <GoogleSubmit label="Continue with Google" />
+        </form>
+      )}
+      <Divider />
+    </>
+  );
+}
+
+/** Email → code. The same form signs people up and logs them in. */
+function EmailCodeForm({ label, cta }: { label: string; cta: string }) {
+  const [state, action] = useActionState<AuthFormState, FormData>(requestEmailCode, undefined);
+  return (
+    <>
+      <ErrorNotice state={state} />
+      <form action={action} className="flex flex-col gap-4" noValidate>
+        <Field label={label} htmlFor="email">
+          <Input id="email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required autoFocus defaultValue={state?.email} aria-invalid={Boolean(state?.error) || undefined} />
+        </Field>
+        <Submit>
+          {cta}
+          <ArrowRight className="size-4" aria-hidden />
+        </Submit>
+      </form>
+    </>
+  );
+}
+
+function PasswordLoginForm({ next, initialError }: { next: string; initialError?: string }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signIn, initialError ? { error: initialError } : undefined);
   return (
     <>
-      {google ? (
-        <>
-          {google === "privy" ? (
-            <GoogleLink label="Continue with Google" next={next} />
-          ) : (
-            <form action={signInWithGoogle}>
-              <input type="hidden" name="next" value={next} />
-              <GoogleSubmit label="Continue with Google" />
-            </form>
-          )}
-          <Divider />
-        </>
-      ) : null}
       <ErrorNotice state={state} />
       <form action={action} className="flex flex-col gap-4" noValidate>
         <input type="hidden" name="next" value={next} />
@@ -87,23 +112,48 @@ export function LoginForm({ next, initialError, google }: { next: string; initia
   );
 }
 
-export function SignupForm({ google }: { google: "privy" | "supabase" | null }) {
+export function LoginForm({ next, initialError, google, codes }: { next: string; initialError?: string; google: "privy" | "supabase" | null; codes: boolean }) {
+  const [withPassword, setWithPassword] = useState(!codes);
+  return (
+    <>
+      <GoogleChoice google={google} next={next} />
+      {initialError && !withPassword ? <Notice tone="danger" title={initialError} className="mb-5" /> : null}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div key={withPassword ? "password" : "code"} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
+          {withPassword ? <PasswordLoginForm next={next} initialError={codes ? undefined : initialError} /> : <EmailCodeForm label="Email" cta="Email me a code" />}
+        </motion.div>
+      </AnimatePresence>
+      {codes ? (
+        <button
+          type="button"
+          onClick={() => setWithPassword((v) => !v)}
+          className="mt-4 flex w-full items-center justify-center gap-1.5 text-[13px] font-medium text-muted transition-colors hover:text-ink"
+        >
+          {withPassword ? <Mail className="size-3.5" aria-hidden /> : <KeyRound className="size-3.5" aria-hidden />}
+          {withPassword ? "Email me a code instead" : "Use my password instead"}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+export function SignupForm({ google, codes }: { google: "privy" | "supabase" | null; codes: boolean }) {
+  if (codes) {
+    return (
+      <>
+        <GoogleChoice google={google} next="/onboarding" />
+        <EmailCodeForm label="Email address" cta="Create account" />
+      </>
+    );
+  }
+  return <PasswordSignupForm google={google} />;
+}
+
+function PasswordSignupForm({ google }: { google: "privy" | "supabase" | null }) {
   const [state, action] = useActionState<AuthFormState, FormData>(signUp, undefined);
   return (
     <>
-      {google ? (
-        <>
-          {google === "privy" ? (
-            <GoogleLink label="Continue with Google" next="/onboarding" />
-          ) : (
-            <form action={signInWithGoogle}>
-              <input type="hidden" name="next" value="/onboarding" />
-              <GoogleSubmit label="Continue with Google" />
-            </form>
-          )}
-          <Divider />
-        </>
-      ) : null}
+      <GoogleChoice google={google} next="/onboarding" />
       <ErrorNotice state={state} />
       <form action={action} className="flex flex-col gap-4" noValidate>
         <Field label="Your name" htmlFor="name">

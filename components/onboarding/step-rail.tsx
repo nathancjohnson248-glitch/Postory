@@ -2,11 +2,12 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const ONBOARDING_STEPS = [
+  { id: "about", label: "You" },
   { id: "business", label: "Business" },
-  { id: "social", label: "Networks" },
   { id: "voice", label: "Voice" },
-  { id: "plan", label: "Plan" },
-  { id: "finish", label: "Finish" },
+  { id: "social", label: "Networks" },
+  { id: "story", label: "First story" },
+  { id: "plan", label: "Trial" },
 ] as const;
 
 export function StepRail({ current }: { current: string }) {

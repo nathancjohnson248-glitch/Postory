@@ -104,8 +104,19 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
             </dl>
           ) : null}
 
-          <div className="mt-7 flex flex-wrap items-center gap-2">
-            {live && availability.manage ? <ManageBillingButton /> : null}
+          {subscription?.provider_subscription_id && availability.manage ? (
+            <div className="mt-7 flex flex-col gap-4 rounded-2xl bg-wash p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="min-w-0">
+                <p className="text-[14.5px] font-medium">Card, receipts, plan and cancellation</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-muted">
+                  Opens HandyPay&apos;s secure page for your subscription — the same one linked in your HandyPay emails.
+                </p>
+              </div>
+              <ManageBillingButton />
+            </div>
+          ) : null}
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
             {live && availability.cancel && !subscription?.cancel_at_period_end ? <CancelSubscriptionButton periodEnd={fmt(subscription?.current_period_end ?? null)} /> : null}
             {live && subscription?.cancel_at_period_end ? <ResumeSubscriptionButton /> : null}
             {subscription?.provider_subscription_id ? <RefreshBillingButton /> : null}

@@ -28,10 +28,21 @@ export const safeNextPath = z
   .refine((v) => v.startsWith("/") && !v.startsWith("//") && !v.includes("\\"), "Invalid redirect")
   .catch("/app");
 
+/** What someone is building — shapes which stories Postory suggests and how it frames them. */
 export const BUSINESS_TYPES = [
+  "Indie founder or startup",
+  "Creator or personal brand",
+  "Online business",
+  "Local business",
+  "Agency or studio",
+  "Professional service",
+  "Something else",
+] as const;
+
+/** Earlier choices, still valid on existing profiles. */
+const LEGACY_BUSINESS_TYPES = [
   "Software or app",
   "Ecommerce",
-  "Local business",
   "Restaurant or hospitality",
   "Agency or services",
   "Creator or media",
@@ -39,6 +50,8 @@ export const BUSINESS_TYPES = [
   "Nonprofit",
   "Other",
 ] as const;
+
+export const businessTypeSchema = z.enum([...BUSINESS_TYPES, ...LEGACY_BUSINESS_TYPES], { message: "Pick the closest fit." });
 
 const optionalUrl = z
   .string()
@@ -65,7 +78,7 @@ export const timezoneSchema = z
 export const BusinessSchema = z.object({
   businessName: trimmed(120).min(1, "What's your business called?"),
   businessDescription: trimmed(1000).min(10, "Give Postory a sentence or two about what you do."),
-  businessType: z.enum(BUSINESS_TYPES, { message: "Pick the closest fit." }),
+  businessType: businessTypeSchema,
   websiteUrl: optionalUrl,
   timezone: timezoneSchema,
 });
@@ -75,6 +88,11 @@ export const VOICE_PRESETS = ["Casual", "Professional", "Bold", "Technical", "Fu
 export const VoiceSchema = z.object({
   presets: z.array(z.enum(VOICE_PRESETS)).max(VOICE_PRESETS.length).default([]),
   notes: trimmed(600).default(""),
+});
+
+export const AboutSchema = z.object({
+  name: trimmed(80).min(1, "What should Postory call you?"),
+  businessType: z.enum(BUSINESS_TYPES, { message: "Pick the closest fit." }),
 });
 
 export const ProfileSchema = z.object({

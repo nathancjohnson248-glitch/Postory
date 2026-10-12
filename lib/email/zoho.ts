@@ -144,3 +144,13 @@ export async function replyToMessage(messageId: string, message: { to: string; s
     body: { action: "reply", fromAddress: env.zohoFrom(), toAddress: message.to, subject: message.subject, content: message.html, mailFormat: "html" },
   });
 }
+
+/**
+ * Forward everything that reaches the mailbox to another address
+ * (PUT /api/accounts/{accountId}, mode addMailForward). Needs the
+ * ZohoMail.accounts.UPDATE scope. Zoho emails the target address a
+ * confirmation link before forwarding starts.
+ */
+export async function addMailForward(to: string) {
+  await zoho("", { method: "PUT", body: { mode: "addMailForward", isUserForward: true, mailForward: [{ mailForwardTo: to }] } });
+}

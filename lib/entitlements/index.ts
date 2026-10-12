@@ -108,3 +108,40 @@ export async function getUsageSummary(userId: string, entitlements: Entitlements
     limit: entitlements.limits[METRIC_LIMIT_KEY[metric]],
   }));
 }
+
+/**
+ * Before a plan exists, onboarding may write one first story (plus one retry)
+ * so people see what Postory does before starting a trial. Counted against
+ * the same usage log, over the account's whole life.
+ */
+export const PREVIEW_GENERATIONS = 2;
+
+export async function previewGenerationsLeft(userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("usage_events").select("quantity").eq("user_id", userId).eq("metric", "ai_generation");
+  const used = (data ?? []).reduce((n, r) => n + r.quantity, 0);
+  return Math.max(0, PREVIEW_GENERATIONS - used);
+}
+
+export async function consumePreviewGeneration(userId: string) {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("consume_usage", {
+    p_user_id: userId,
+    p_metric: "ai_generation",
+    p_quantity: 1,
+    p_limit: PREVIEW_GENERATIONS,
+    p_since: new Date(0).toISOString(),
+  });
+  if (error) {
+    log.error("preview reservation failed", { operation: "consume_usage", userId, metric: "ai_generation" }, error);
+    throw new Error("Could not check your usage. Please try again.");
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.allowed) throw new EntitlementError("no_plan", "You've seen what Postory can do — start your trial to keep writing.");
+  return {
+    release: async () => {
+      const { error: releaseError } = await admin.from("usage_events").insert({ user_id: userId, metric: "ai_generation", quantity: -1 });
+      if (releaseError) log.warn("usage release failed", { operation: "release_usage", userId, metric: "ai_generation" }, releaseError);
+    },
+  };
+}
