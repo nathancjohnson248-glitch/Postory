@@ -359,16 +359,22 @@ export function MemoryManager({ rows }: { rows: MemoryRow[] }) {
   );
 }
 
-export function DeleteAccount() {
+export function DeleteAccount({ trigger = "button" }: { trigger?: "button" | "link" }) {
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   return (
     <>
-      <Button variant="danger" onClick={() => setOpen(true)} icon={<Trash2 className="size-4" />}>
-        Delete account
-      </Button>
+      {trigger === "link" ? (
+        <button type="button" onClick={() => setOpen(true)} className="rounded-lg px-2 py-1 text-sm text-faint transition-colors hover:text-danger">
+          Delete account
+        </button>
+      ) : (
+        <Button variant="danger" onClick={() => setOpen(true)} icon={<Trash2 className="size-4" />}>
+          Delete account
+        </Button>
+      )}
       <Dialog
         open={open}
         onClose={() => !pending && setOpen(false)}
