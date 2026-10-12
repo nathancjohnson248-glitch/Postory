@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays, CheckCheck, ImageIcon, Mail, MessageSquareText, PenLine } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
-import { PlatformIcon } from "@/components/brand/platform-icon";
 import { PlanCards } from "@/components/billing/plan-cards";
 import { Compare } from "@/components/marketing/compare";
+import { NetworkOrbit } from "@/components/marketing/network-orbit";
 import { Faq } from "@/components/marketing/faq";
 import {
   AnalyticsDemo,
@@ -18,11 +18,9 @@ import {
   StoryInputDemo,
 } from "@/components/marketing/product-demos";
 import { Reveal } from "@/components/marketing/reveal";
-import { Marquee } from "@/components/motion/marquee";
 import { RiseText } from "@/components/motion/rise-text";
 import { Spotlight } from "@/components/motion/spotlight";
 import { buttonClasses } from "@/components/ui/button";
-import { PLATFORMS, PLATFORM_META } from "@/lib/social/platforms";
 import { site } from "@/lib/site";
 
 function SectionIntro({
@@ -100,17 +98,18 @@ export default function HomePage() {
       </section>
 
       {/* Networks */}
-      <section aria-label="Supported networks" className="border-y border-line bg-surface">
-        <div className="mx-auto flex max-w-7xl flex-col items-center gap-5 px-5 py-8 sm:px-8 lg:flex-row lg:gap-12 lg:py-10">
-          <p className="shrink-0 text-[14px] text-muted">One story out to every network you use</p>
-          <Marquee className="w-full min-w-0 flex-1">
-            {PLATFORMS.map((p) => (
-              <span key={p} className="flex items-center gap-2 whitespace-nowrap text-[15px] font-medium text-ink-soft">
-                <PlatformIcon platform={p} className="size-4" />
-                {PLATFORM_META[p].name}
-              </span>
-            ))}
-          </Marquee>
+      <section aria-label="Supported networks" className="relative overflow-hidden border-y border-line bg-surface">
+        <div className="hairline-grid absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" aria-hidden />
+        <div className="relative mx-auto max-w-7xl px-5 pb-10 pt-14 sm:px-8 sm:pb-14 sm:pt-20">
+          <Reveal>
+            <p className="text-center font-mono text-[11px] uppercase tracking-[0.16em] text-blue-600">Eight networks · one story</p>
+            <h2 className="mx-auto mt-3 max-w-xl text-center font-display text-[32px] leading-[1.05] tracking-[-0.02em] text-balance sm:text-[44px]">
+              One story out to <em>every network you use.</em>
+            </h2>
+          </Reveal>
+          <div className="mt-6 sm:mt-4">
+            <NetworkOrbit />
+          </div>
         </div>
       </section>
 

@@ -312,3 +312,18 @@
     animation: none;
   }
 }
+
+/* Network lines: the story flowing out from Postory. */
+.orbit-flow {
+  animation: orbit-flow 1.6s linear infinite;
+}
+@keyframes orbit-flow {
+  to {
+    stroke-dashoffset: -18;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-flow {
+    animation: none;
+  }
+}

@@ -3,7 +3,12 @@ import type { Platform } from "@/lib/social/platforms";
 import { PLATFORM_META } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
+/** LinkedIn's "in" glyph — used only to label the LinkedIn integration. */
+const LINKEDIN_IN =
+  "M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452z";
+
 const ICONS: Partial<Record<Platform, { path: string; hex: string }>> = {
+  linkedin: { path: LINKEDIN_IN, hex: "0A66C2" },
   x: siX,
   instagram: siInstagram,
   facebook: siFacebook,
@@ -40,15 +45,10 @@ export function PlatformIcon({
   const name = PLATFORM_META[platform].name;
 
   const glyph = icon ? (
-    <svg viewBox="0 0 24 24" className={cn(tile ? "size-[55%]" : "size-full")} fill="currentColor" aria-hidden>
+    <svg viewBox="0 0 24 24" className={cn(tile ? (platform === "linkedin" ? "size-[50%]" : "size-[55%]") : "size-full")} fill="currentColor" aria-hidden>
       <path d={icon.path} />
     </svg>
-  ) : (
-    // LinkedIn's mark is not available under an open licence; use a plain monogram.
-    <span className={cn("font-bold leading-none tracking-[-0.04em]", tile ? "text-[0.6em]" : "text-[0.75em]")} aria-hidden>
-      in
-    </span>
-  );
+  ) : null;
 
   if (tile) {
     return (

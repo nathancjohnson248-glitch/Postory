@@ -21,6 +21,7 @@ export function PostPreview({
   className,
   clamp,
   hideEmptyMedia = false,
+  avatar,
 }: {
   platform: Platform;
   content: string;
@@ -32,13 +33,15 @@ export function PostPreview({
   clamp?: number;
   /** Don't draw a placeholder frame when there's no media yet. */
   hideEmptyMedia?: boolean;
+  /** The account's picture; falls back to an initial. */
+  avatar?: ReactNode;
 }) {
   const mediaFirst = (platform === "instagram" || platform === "pinterest" || platform === "tiktok") && !(hideEmptyMedia && !media.length);
   const initial = authorName.trim().charAt(0).toUpperCase() || "P";
 
   const header = (
     <div className="flex items-center gap-2.5">
-      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-[13px] font-semibold text-white">{initial}</span>
+      {avatar ?? <span className="grid size-8 shrink-0 place-items-center rounded-full bg-ink text-[13px] font-semibold text-white">{initial}</span>}
       <div className="min-w-0 flex-1 leading-tight">
         <p className="truncate text-[13px] font-semibold text-ink">{authorName}</p>
         {handle ? <p className="truncate text-xs text-muted">{handle}</p> : null}

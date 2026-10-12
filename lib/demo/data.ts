@@ -51,11 +51,46 @@ export const demoPosts: DemoPost[] = [
   },
 ];
 
+/** A second example story, so the page isn't the same launch over and over. */
+export const demoVersionsStory = {
+  title: "Dark mode",
+  source: "We shipped dark mode today — it was the most-requested feature since launch, asked for by 212 people.",
+};
+
+export const demoVersions: DemoPost[] = [
+  {
+    platform: "x",
+    status: "published",
+    when: "Today, 10:12 AM",
+    content: "dark mode is here.\n\n212 of you asked for it. it's on by default if your phone is set to dark.",
+  },
+  {
+    platform: "linkedin",
+    status: "scheduled",
+    when: "Tomorrow, 8:30 AM",
+    content:
+      "We shipped dark mode in Fernwood today.\n\nIt's been our most-requested feature since launch — 212 people asked for it. We took our time so it would feel calm at night, not just inverted.\n\nThanks to everyone who kept asking.",
+  },
+  {
+    platform: "instagram",
+    status: "awaiting_review",
+    when: "Needs review",
+    content: "Night owls, this one's for you 🌙\n\nDark mode is live in Fernwood.\n\n#habittracker #darkmode",
+    image: "/demo/fernwood-launch.svg",
+  },
+  {
+    platform: "threads",
+    status: "approved",
+    when: "Approved",
+    content: "dark mode just landed. 212 requests later, we finally listened properly 🖤",
+  },
+];
+
 export const demoCalendar: { day: number; platform: Platform; time: string; title: string; status: PostStatus }[] = [
   { day: 3, platform: "linkedin", time: "8:30", title: "Hiring our first designer", status: "published" },
   { day: 6, platform: "x", time: "12:00", title: "Widget update", status: "published" },
   { day: 9, platform: "instagram", time: "17:15", title: "Behind the launch", status: "published" },
-  { day: 12, platform: "x", time: "9:04", title: "37 downloads in the first hour", status: "published" },
+  { day: 12, platform: "x", time: "10:12", title: "Dark mode is here", status: "published" },
   { day: 13, platform: "linkedin", time: "8:30", title: "Today we launched on iOS", status: "scheduled" },
   { day: 15, platform: "threads", time: "19:00", title: "okay we actually shipped it", status: "scheduled" },
   { day: 18, platform: "bluesky", time: "10:30", title: "Dark mode is here", status: "scheduled" },
