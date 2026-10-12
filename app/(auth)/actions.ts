@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { authEmailMode, confirmWithoutEmail, createConfirmedAccount, resendSignupCode, sendPasswordResetCode, startSignupWithCode } from "@/lib/auth/email-codes";
 import { requestOrigin } from "@/lib/auth/origin";
 import { clearPendingEmail, getPendingEmail, setPendingEmail } from "@/lib/auth/pending";
+import { sendWelcomeEmail } from "@/lib/email/welcome";
 import { log } from "@/lib/log";
 import { site } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
@@ -119,8 +120,9 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
     if (outcome.status === "throttled") return { error: "Too many sign-ups from this network just now. Try again in a little while.", email };
     if (outcome.status === "failed") return { error: "We couldn't create your account. Try again in a minute.", email };
     const supabase = await createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: parsed.data.password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: parsed.data.password });
     if (error) return { error: friendlyAuthError(error), email };
+    sendWelcomeEmail(data.user, parsed.data.name);
     redirect("/onboarding");
   }
 
@@ -158,7 +160,10 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
       return { error: friendlyAuthError(error), email };
     }
     // Email confirmation is switched off for the project: straight in.
-    if (data.session) redirect("/onboarding");
+    if (data.session) {
+      sendWelcomeEmail(data.user, parsed.data.name);
+      redirect("/onboarding");
+    }
     // Auth hides existing accounts behind a user with no identities.
     if (data.user && data.user.identities?.length === 0) return { error: EXISTS, email };
   }
@@ -174,9 +179,10 @@ export async function verifySignupCode(_prev: AuthFormState, formData: FormData)
   if (!code.success) return { error: firstError(code.error), attempt: Date.now() };
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "email" });
+  const { data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "email" });
   if (error) return { error: friendlyAuthError(error), attempt: Date.now() };
 
+  sendWelcomeEmail(data.user);
   await clearPendingEmail("verify");
   redirect("/onboarding");
 }

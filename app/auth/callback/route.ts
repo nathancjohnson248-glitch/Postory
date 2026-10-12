@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { isFirstSignIn, sendWelcomeEmail } from "@/lib/email/welcome";
 import { redirectTo } from "@/lib/http/public-url";
 import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
@@ -27,10 +28,13 @@ export async function GET(request: NextRequest) {
   let failed = false;
 
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
       failed = true;
       log.warn("auth code exchange failed", { operation: "auth.callback" }, error);
+    } else if (data.user && isFirstSignIn(data.user)) {
+      // A brand-new Google account.
+      sendWelcomeEmail(data.user);
     }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });

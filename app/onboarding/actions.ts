@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 import { getProfile, requireUser } from "@/lib/auth/session";
-import { sendEmail } from "@/lib/email/send";
 import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import { BusinessSchema, VoiceSchema, fieldErrors } from "@/lib/validation/schemas";
@@ -115,6 +114,5 @@ export async function completeOnboarding() {
     log.error("complete onboarding failed", { operation: "onboarding.complete", userId: user.id }, error);
     throw new Error("We couldn't finish setup. Try again.");
   }
-  if (data) await sendEmail(data.email ?? user.email, "welcome", { name: data.name });
   redirect("/app");
 }
