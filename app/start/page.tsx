@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check, Lock } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { PlanPicker } from "@/components/billing/plan-picker";
+import { TrialPicker } from "@/components/billing/trial-picker";
 import { DeleteAccount } from "@/components/app/settings/forms";
 import { CheckoutReturnNotice } from "@/components/onboarding/return-notices";
 import { Notice } from "@/components/ui/notice";
@@ -88,7 +88,7 @@ export default async function StartPage({ searchParams }: { searchParams: Promis
           {params.billing ? <CheckoutReturnNotice status={params.billing} /> : null}
           {params.checkout === "canceled" ? <Notice tone="info" title="Checkout was cancelled. No charge was made." className="mx-auto mb-6 max-w-2xl" /> : null}
           {availability.checkout ? (
-            <PlanPicker returnPath="/start" trialEligible={trialEligible} />
+            <TrialPicker returnPath="/start" trialEligible={trialEligible} />
           ) : (
             <Notice tone="info" title="Billing isn't switched on for this deployment" className="mx-auto max-w-2xl">
               Plans can&apos;t be purchased right now. <Link href="/app" className="font-medium underline underline-offset-2">Continue to Postory</Link>.

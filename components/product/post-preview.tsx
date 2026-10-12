@@ -20,6 +20,7 @@ export function PostPreview({
   meta,
   className,
   clamp,
+  hideEmptyMedia = false,
 }: {
   platform: Platform;
   content: string;
@@ -29,8 +30,10 @@ export function PostPreview({
   meta?: ReactNode;
   className?: string;
   clamp?: number;
+  /** Don't draw a placeholder frame when there's no media yet. */
+  hideEmptyMedia?: boolean;
 }) {
-  const mediaFirst = platform === "instagram" || platform === "pinterest" || platform === "tiktok";
+  const mediaFirst = (platform === "instagram" || platform === "pinterest" || platform === "tiktok") && !(hideEmptyMedia && !media.length);
   const initial = authorName.trim().charAt(0).toUpperCase() || "P";
 
   const header = (

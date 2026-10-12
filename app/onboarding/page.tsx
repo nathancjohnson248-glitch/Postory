@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { NetworkList } from "@/components/app/network-list";
 import { PlanCards } from "@/components/billing/plan-cards";
-import { PlanPicker } from "@/components/billing/plan-picker";
+import { TrialPicker } from "@/components/billing/trial-picker";
 import { StepRail } from "@/components/onboarding/step-rail";
 import { FirstStoryComposer, FirstStoryResults, type FirstStory } from "@/components/onboarding/first-story";
 import { AboutStep, BackButton, BusinessStep, FinishButton, NextStepButton, VoiceStep } from "@/components/onboarding/steps";
@@ -174,7 +174,7 @@ async function PlanStep({ userId, checkoutParam, eventParam, canSkip }: { userId
       {eventParam ? <CheckoutReturnNotice status={eventParam} /> : null}
       {checkoutParam === "canceled" ? <Notice tone="info" title="Checkout was cancelled. No charge was made." className="mx-auto mb-6 max-w-2xl" /> : null}
       {availability.checkout ? (
-        <PlanPicker returnPath="/onboarding" trialEligible={!subscription} />
+        <TrialPicker returnPath="/onboarding" trialEligible={!subscription} />
       ) : (
         <>
           <Notice tone="info" title="Billing isn't live yet" className="mx-auto mb-8 max-w-2xl">

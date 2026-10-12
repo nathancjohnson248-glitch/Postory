@@ -130,7 +130,7 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
                 maxLength={4000}
                 rows={4}
                 autoFocus
-                placeholder="We launched our iOS app today and got 37 downloads in the first hour."
+                placeholder="e.g. We launched our iOS app today and got 37 downloads in the first hour."
                 className="block min-h-40 w-full resize-none rounded-t-3xl bg-transparent px-6 pb-2 pt-6 font-display text-[24px] leading-[1.3] tracking-[-0.01em] text-ink placeholder:text-faint focus:outline-none sm:text-[28px]"
               />
               <div className="border-t border-line px-4 py-4 sm:px-5">
@@ -322,7 +322,16 @@ function PostCardLite({ post, authorName, onChange }: { post: FirstStoryPost; au
           </div>
         </div>
       ) : (
-        <PostPreview platform={post.platform} content={post.content} authorName={authorName} className="flex-1" clamp={14} />
+        <div className="flex flex-1 flex-col gap-3">
+          <PostPreview platform={post.platform} content={post.content} authorName={authorName} clamp={14} hideEmptyMedia />
+          {PLATFORM_META[post.platform].mediaRequired !== "none" ? (
+            <p className="mt-auto rounded-xl bg-wash px-3 py-2 text-[12.5px] leading-relaxed text-muted">
+              {PLATFORM_META[post.platform].mediaRequired === "video"
+                ? `${PLATFORM_META[post.platform].name} needs a video. Upload one once your trial starts.`
+                : `${PLATFORM_META[post.platform].name} needs an image. Create one with AI or upload your own once your trial starts.`}
+            </p>
+          ) : null}
+        </div>
       )}
       {!editing ? (
         <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-4">
