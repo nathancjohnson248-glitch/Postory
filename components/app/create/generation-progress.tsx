@@ -74,3 +74,35 @@ export function GenerationProgress({ current }: { current: StageId | null }) {
     </ol>
   );
 }
+
+/**
+ * When a story is too thin to write without guessing, Postory asks instead.
+ * Shown where the posts would have appeared; nothing was charged.
+ */
+export function NeedsDetail({ questions }: { questions: string[] }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      className="flex gap-4 rounded-3xl bg-blue-50/60 p-5 ring-1 ring-blue-100 sm:p-6"
+      role="status"
+    >
+      <LogoMark className="mt-0.5 size-9 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[15px] font-semibold tracking-[-0.01em]">Tell Postory a little more first</p>
+        <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
+          There isn&apos;t enough here to write without guessing, and Postory doesn&apos;t make things up. Add the answers to your story, then generate again. This didn&apos;t use a generation.
+        </p>
+        <ul className="mt-3 flex flex-col gap-1.5">
+          {questions.map((q) => (
+            <li key={q} className="flex gap-2 text-[14px] text-ink">
+              <span className="mt-[9px] size-1 shrink-0 rounded-full bg-blue-500" aria-hidden />
+              {q}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </motion.div>
+  );
+}

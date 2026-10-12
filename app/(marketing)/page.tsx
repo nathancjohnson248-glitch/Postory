@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, CheckCheck, ImageIcon, Mail, MessageSquareText, PenLine } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
@@ -22,6 +23,10 @@ import { RiseText } from "@/components/motion/rise-text";
 import { Spotlight } from "@/components/motion/spotlight";
 import { buttonClasses } from "@/components/ui/button";
 import { site } from "@/lib/site";
+
+
+// The tab title stays the root default the founder chose.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 function SectionIntro({
   eyebrow,
@@ -321,7 +326,7 @@ export default function HomePage() {
                 Postory <em>remembers.</em>
               </>
             }
-            body="Every story you tell, every question you answer and every preference you set becomes something Postory knows next time. Your tenth post sounds more like you than your first — and you can see, edit or delete everything it knows."
+            body="When Postory asks a question, your answer can be saved for next time — along with the facts you add and the voice you set. Each story starts with more of what's true about your business, and you can see, edit or delete everything it knows."
           />
         </Reveal>
         <Reveal delay={0.1}>

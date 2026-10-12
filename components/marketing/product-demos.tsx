@@ -520,13 +520,13 @@ export function InboxDemo() {
 }
 
 const MEMORY_EVENTS = [
-  { source: "From your story", fact: "Opened the Android waitlist — 480 sign-ups in the first week.", tone: "blue" },
+  { source: "Saved from a story", fact: "Opened the Android waitlist — 480 sign-ups in the first week.", tone: "blue" },
   { source: "From your answer", fact: "Postory asked what's next. You said: dark mode, this month.", tone: "green" },
   { source: "You added", fact: "Don't mention Android until it's announced.", tone: "ink" },
   { source: "Your voice", fact: "Casual and short. Lowercase is fine on X.", tone: "amber" },
 ] as const;
 
-/** "Postory remembers": memory grows from stories, approvals and what you add. */
+/** "Postory remembers": memory grows from answers you save, facts you add and your voice. */
 export function MemoryLearnsDemo() {
   return (
     <div className="rounded-3xl bg-surface p-6 shadow-lift ring-1 ring-line">

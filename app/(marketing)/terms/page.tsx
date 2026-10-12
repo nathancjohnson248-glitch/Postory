@@ -3,7 +3,7 @@ import { PageHero, Prose } from "@/components/marketing/page-hero";
 import { TRIAL_DAYS } from "@/lib/billing/plans";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Terms", description: "The terms for using Postory." };
+export const metadata: Metadata = { title: "Terms", description: "The terms for using Postory.", alternates: { canonical: "/terms" } };
 
 export default function TermsPage() {
   return (

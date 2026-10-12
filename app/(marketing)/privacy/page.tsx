@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PageHero, Prose } from "@/components/marketing/page-hero";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Privacy", description: "How Postory collects, uses and protects your information." };
+export const metadata: Metadata = { title: "Privacy", description: "How Postory collects, uses and protects your information.", alternates: { canonical: "/privacy" } };
 
 export default function PrivacyPage() {
   return (

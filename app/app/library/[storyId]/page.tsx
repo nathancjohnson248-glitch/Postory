@@ -22,16 +22,17 @@ import { getSocialReadiness } from "@/lib/social/service";
 import { createClient } from "@/lib/supabase/server";
 import { formatInZone, safeTimeZone } from "@/lib/time";
 import { idSchema } from "@/lib/validation/schemas";
-import type { Platform } from "@/lib/social/platforms";
+import { PLATFORM_META, isPlatform, type Platform } from "@/lib/social/platforms";
 import { Suspense } from "react";
 
 export const metadata: Metadata = { title: "Story" };
 export const maxDuration = 60;
 
-type Analysis = { angles?: string[]; missingInformation?: string[]; schedulingSuggestion?: string | null };
+type Analysis = { facts?: string[]; angles?: string[]; missingInformation?: string[]; schedulingSuggestion?: string | null };
 
-export default async function StoryPage({ params }: { params: Promise<{ storyId: string }> }) {
+export default async function StoryPage({ params, searchParams }: { params: Promise<{ storyId: string }>; searchParams: Promise<{ missing?: string }> }) {
   const { storyId } = await params;
+  const { missing } = await searchParams;
   if (!idSchema.safeParse(storyId).success) notFound();
   const { user, profile } = await requireAppAccess();
   await reconcileQuietly(user.id);
@@ -59,6 +60,9 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
   const counts = posts.reduce<Partial<Record<PostStatus, number>>>((acc, p) => ({ ...acc, [p.status]: (acc[p.status] ?? 0) + 1 }), {});
   const reviewCount = (counts.awaiting_review ?? 0) + (counts.draft ?? 0);
   const prefs = profile.ai_preferences as { defaultPlatforms?: Platform[] } | null;
+  const written = [...new Set(posts.map((p) => p.platform))].filter(isPlatform);
+  // Networks the last run asked for but didn't get, passed back by the composer.
+  const retry = (missing ?? "").split(",").filter(isPlatform).filter((p) => !written.includes(p));
 
   return (
     <div className="flex flex-col gap-8">
@@ -90,6 +94,20 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
         <blockquote className="rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line sm:p-8">
           <p className="font-display text-[26px] leading-[1.3] tracking-[-0.01em] text-ink sm:text-[30px]">“{story.source_text}”</p>
           {story.summary ? <p className="mt-5 border-t border-line pt-4 text-[14px] leading-relaxed text-muted">{story.summary}</p> : null}
+          {analysis.facts?.length ? (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="text-[12.5px] font-semibold text-ink-soft">What Postory understood</p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {analysis.facts.map((f) => (
+                  <li key={f} className="flex gap-2 text-[13.5px] leading-relaxed text-muted">
+                    <span className="mt-[9px] size-1 shrink-0 rounded-full bg-blue-500" aria-hidden />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[12px] text-faint">Posts only use these facts. If one is wrong, edit the story and regenerate.</p>
+            </div>
+          ) : null}
         </blockquote>
         <div className="flex flex-col gap-4">
           {analysis.angles?.length ? (
@@ -125,6 +143,12 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
         </Notice>
       ) : null}
 
+      {posts.length && retry.length ? (
+        <Notice tone="warning" title={`Postory wrote ${posts.length} of ${posts.length + retry.length} posts.`}>
+          {retry.map((p) => PLATFORM_META[p].name).join(" and ")} {retry.length === 1 ? "needs" : "need"} another attempt. Your other posts are saved — retry below.
+        </Notice>
+      ) : null}
+
       {posts.length ? (
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           {posts.map((post) => (
@@ -148,7 +172,21 @@ export default async function StoryPage({ params }: { params: Promise<{ storyId:
             />
           ))}
         </div>
-      ) : (
+      ) : null}
+
+      {posts.length && retry.length ? (
+        <GenerateForStory
+          key={retry.join(",")}
+          storyId={story.id}
+          defaultPlatforms={[]}
+          written={written}
+          retry={retry}
+          enabled={aiAvailable() && entitlements.active}
+          reason={!aiAvailable() ? "Post generation isn't configured yet." : "Generating posts needs a plan."}
+        />
+      ) : null}
+
+      {posts.length ? null : (
         <GenerateForStory
           storyId={story.id}
           defaultPlatforms={Array.isArray(prefs?.defaultPlatforms) ? prefs.defaultPlatforms : []}

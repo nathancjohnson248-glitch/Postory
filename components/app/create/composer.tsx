@@ -12,7 +12,7 @@ import { Notice } from "@/components/ui/notice";
 import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 import { createManualStory } from "@/app/_actions/stories";
-import { GenerationProgress, WritingMark, type StageId } from "./generation-progress";
+import { GenerationProgress, NeedsDetail, WritingMark, type StageId } from "./generation-progress";
 import { useDictation } from "./use-dictation";
 
 export type GenerationAvailability =
@@ -44,6 +44,7 @@ export function Composer({
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<string[]>([]);
   const [writingManually, setWritingManually] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
 
@@ -76,6 +77,7 @@ export function Composer({
     setError(null);
     setStage(null);
     setSavedStoryId(null);
+    setQuestions([]);
     let storyId: string | null = null;
     try {
       const response = await fetch("/api/ai/generate", {
@@ -105,7 +107,15 @@ export function Composer({
           } else if (event.type === "stage") {
             setStage(event.stage);
           } else if (event.type === "done") {
-            router.push(`/app/library/${event.storyId}?generated=1`);
+            router.push(`/app/library/${event.storyId}?generated=1${event.missingPlatforms?.length ? `&missing=${event.missingPlatforms.join(",")}` : ""}`);
+            return;
+          } else if (event.type === "needs_detail") {
+            // Nothing was written or kept; the text stays here to add to.
+            setSavedStoryId(null);
+            setQuestions(event.questions ?? []);
+            setRunning(false);
+            setStage(null);
+            textarea.current?.focus();
             return;
           } else if (event.type === "error") {
             throw event.error;
@@ -209,6 +219,7 @@ export function Composer({
           </motion.div>
         ) : (
           <motion.div key="actions" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-4">
+            {questions.length ? <NeedsDetail questions={questions} /> : null}
             {error ? (
               <Notice
                 tone="danger"

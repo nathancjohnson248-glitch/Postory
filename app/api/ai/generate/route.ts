@@ -27,6 +27,7 @@ type Event =
   | { type: "story"; storyId: string }
   | { type: "stage"; stage: "understanding" | "writing" | "checking" | "saving" }
   | { type: "done"; storyId: string; posts: number; missingPlatforms: string[] }
+  | { type: "needs_detail"; questions: string[] }
   | { type: "error"; error: { code: string; message: string; action?: { label: string; href: string } } };
 
 /**
@@ -65,6 +66,8 @@ export async function POST(request: NextRequest) {
       const supabase = await createClient();
       let storyId: string | null = body.storyId ?? null;
       let release: (() => Promise<void>) | null = null;
+      // Adding networks to a story that already has posts keeps its title, summary and angles.
+      let addingToExisting = false;
 
       try {
         const entitlements = await getEntitlements(user.id);
@@ -74,12 +77,16 @@ export async function POST(request: NextRequest) {
         if (storyId) {
           const { data: story } = await supabase.from("stories").select("id,source_text").eq("id", storyId).eq("user_id", user.id).maybeSingle();
           if (!story) throw new Error("not_found");
-          const { count } = await supabase.from("story_posts").select("id", { count: "exact", head: true }).eq("story_id", storyId);
-          if (count) {
-            send({ type: "error", error: { code: "already_generated", message: "This story already has posts. Regenerate individual posts instead." } });
+          const { data: existing } = await supabase.from("story_posts").select("platform").eq("story_id", storyId).eq("user_id", user.id);
+          const written = new Set((existing ?? []).map((p) => p.platform));
+          addingToExisting = written.size > 0;
+          const remaining = platforms.filter((p) => !written.has(p));
+          if (!remaining.length) {
+            send({ type: "error", error: { code: "already_generated", message: "This story already has posts for those networks. Regenerate individual posts instead." } });
             controller.close();
             return;
           }
+          platforms.splice(0, platforms.length, ...remaining);
           sourceText = story.source_text;
         } else {
           const create = body as z.infer<typeof CreateStorySchema>;
@@ -102,12 +109,23 @@ export async function POST(request: NextRequest) {
         }
         const usage = preview ? await consumePreviewGeneration(user.id) : await consumeUsage(user.id, entitlements, "ai_generation");
         release = usage.release;
-        await supabase.from("stories").update({ status: "processing" }).eq("id", storyId);
+        if (!addingToExisting) await supabase.from("stories").update({ status: "processing" }).eq("id", storyId);
         const context = await loadBusinessContext(user.id);
 
         // 3. Write.
         send({ type: "stage", stage: "writing" });
-        const result = await generatePosts({ story: sourceText, platforms, context, corpus: factCorpus(context, sourceText) });
+        const result = await generatePosts({ story: sourceText, platforms, context, corpus: factCorpus(context, sourceText), askWhenThin: true });
+
+        // Too vague to write without guessing: ask instead, and don't charge for it.
+        if (result.needsMoreDetail) {
+          await release();
+          release = null;
+          if (body.storyId) await supabase.from("stories").update({ status: addingToExisting ? "ready" : "draft" }).eq("id", storyId).eq("user_id", user.id);
+          // A story created just now holds nothing but the text still in the composer.
+          else await supabase.from("stories").delete().eq("id", storyId).eq("user_id", user.id);
+          send({ type: "needs_detail", questions: result.missingInformation });
+          return;
+        }
 
         // 4. Check (validation + fact check already ran in generatePosts; this marks the step).
         send({ type: "stage", stage: "checking" });
@@ -133,6 +151,10 @@ export async function POST(request: NextRequest) {
           })),
         );
         if (postsError) throw postsError;
+        if (addingToExisting) {
+          send({ type: "done", storyId, posts: result.posts.length, missingPlatforms: result.missingPlatforms });
+          return;
+        }
         await supabase
           .from("stories")
           .update({
@@ -140,6 +162,7 @@ export async function POST(request: NextRequest) {
             summary: result.summary,
             status: "ready",
             angles: {
+              facts: result.facts,
               angles: result.angles,
               missingInformation: result.missingInformation,
               schedulingSuggestion: result.schedulingSuggestion,
@@ -150,7 +173,7 @@ export async function POST(request: NextRequest) {
         send({ type: "done", storyId, posts: result.posts.length, missingPlatforms: result.missingPlatforms });
       } catch (error) {
         if (release) await release();
-        if (storyId) await supabase.from("stories").update({ status: "draft" }).eq("id", storyId).eq("user_id", user.id);
+        if (storyId && !addingToExisting) await supabase.from("stories").update({ status: "draft" }).eq("id", storyId).eq("user_id", user.id);
         const failure = toFailure(error, "ai.generate", user.id);
         if (failure.error.code === "unexpected") log.error("generation failed", { operation: "ai.generate", userId: user.id, resourceId: storyId }, error);
         send({ type: "error", error: failure.error });

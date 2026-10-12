@@ -9,6 +9,7 @@ import { PLANS, PLAN_IDS, TRIAL_DAYS } from "@/lib/billing/plans";
 export const metadata: Metadata = {
   title: "Pricing",
   description: `Solo $15, Pro $29, Max $59 a month. Every Postory plan starts with a ${TRIAL_DAYS}-day trial.`,
+  alternates: { canonical: "/pricing" },
 };
 
 const ROWS: { label: string; get: (id: (typeof PLAN_IDS)[number]) => string }[] = [

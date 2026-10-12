@@ -3,9 +3,9 @@ import { Logo } from "@/components/brand/logo";
 import { site } from "@/lib/site";
 
 const COLUMNS = [
-  { title: "Product", links: [{ href: "/features", label: "Features" }, { href: "/pricing", label: "Pricing" }, { href: "/changelog", label: "Changelog" }, { href: "/changelog#roadmap", label: "Roadmap" }] },
-  { title: "Free tools", links: [{ href: "/tools/character-counter", label: "Character counter" }, { href: "/features#how-it-works", label: "How it works" }] },
-  { title: "Company", links: [{ href: "/about", label: "About" }, { href: `mailto:${site.founder.email}?subject=Postory%20help`, label: "Help" }, { href: `mailto:${site.founder.email}`, label: "Contact" }] },
+  { title: "Product", links: [{ href: "/how-it-works", label: "How it works" }, { href: "/features", label: "Features" }, { href: "/pricing", label: "Pricing" }, { href: "/changelog", label: "Changelog" }] },
+  { title: "Resources", links: [{ href: "/help", label: "Help" }, { href: "/tools/character-counter", label: "Character counter" }, { href: "/changelog#roadmap", label: "Roadmap" }] },
+  { title: "Company", links: [{ href: "/about", label: "About" }, { href: `mailto:${site.founder.email}`, label: "Contact" }] },
   { title: "Legal", links: [{ href: "/privacy", label: "Privacy" }, { href: "/terms", label: "Terms" }] },
 ];
 

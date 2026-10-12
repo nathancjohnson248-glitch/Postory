@@ -16,7 +16,11 @@ function numbersIn(text: string) {
 
 export function findUnsupportedNumbers(generated: string, ...sources: string[]): string[] {
   const allowed = new Set<string>();
-  for (const source of sources) for (const n of numbersIn(source)) allowed.add(n);
+  for (const source of sources) {
+    for (const n of numbersIn(source)) allowed.add(n);
+    // "v2" in the story allows "version 2" in a post.
+    for (const m of source.matchAll(/\bv(\d+(?:\.\d+)*)\b/gi)) allowed.add(m[1]);
+  }
   const unsupported: string[] = [];
   for (const raw of generated.match(NUMBER_PATTERN) ?? []) {
     const n = normalise(raw);

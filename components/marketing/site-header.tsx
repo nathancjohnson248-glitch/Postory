@@ -10,10 +10,10 @@ import { buttonClasses } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/#how-it-works", label: "How it works" },
+  { href: "/how-it-works", label: "How it works" },
   { href: "/features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
-  { href: "/tools/character-counter", label: "Free tools" },
+  { href: "/help", label: "Help" },
   { href: "/about", label: "About" },
 ];
 

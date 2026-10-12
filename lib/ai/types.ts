@@ -19,18 +19,22 @@ export const ModelGeneratedPost = z.object({
 });
 
 export const ModelGeneration = z.object({
+  // First, so the model commits to the facts before it writes anything.
+  facts: z.array(z.string()),
   storyTitle: z.string(),
   summary: z.string(),
   angles: z.array(z.string()),
   posts: z.array(ModelGeneratedPost),
   missingInformation: z.array(z.string()),
   schedulingSuggestion: z.string().nullable(),
+  needsMoreDetail: z.boolean(),
 });
 
 export const ValidatedGeneration = z.object({
+  facts: z.array(z.string().trim().min(1).max(300)).max(24).default([]),
   storyTitle: z.string().trim().min(1).max(120),
   summary: z.string().trim().max(600),
-  angles: z.array(z.string().trim().min(1).max(240)).min(1).max(6),
+  angles: z.array(z.string().trim().min(1).max(240)).max(6),
   posts: z
     .array(
       z.object({
@@ -42,10 +46,10 @@ export const ValidatedGeneration = z.object({
         mediaSuggestion: z.string().trim().max(500).nullable(),
       }),
     )
-    .min(1)
     .max(PLATFORMS.length),
   missingInformation: z.array(z.string().trim().max(240)).max(6),
   schedulingSuggestion: z.string().trim().max(300).nullable(),
+  needsMoreDetail: z.boolean().default(false),
 });
 
 export type GenerationResult = z.infer<typeof ValidatedGeneration>;

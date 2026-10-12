@@ -89,7 +89,8 @@ function MediaFrame({ platform, media }: { platform: Platform; media: PreviewMed
   const first = media[0];
   if (!first) {
     return (
-      <div className={cn("grid w-full place-items-center rounded-2xl border border-dashed border-line-strong bg-wash text-faint", aspect)}>
+      // Empty: a compact slot, not a full-size blank frame — the card below says what's needed.
+      <div className="grid h-24 w-full place-items-center rounded-2xl border border-dashed border-line-strong bg-wash text-faint">
         <div className="flex flex-col items-center gap-1.5 text-xs">
           {PLATFORM_META[platform].mediaRequired === "video" ? <Play className="size-5" aria-hidden /> : <ImageIcon className="size-5" aria-hidden />}
           {PLATFORM_META[platform].mediaRequired === "none" ? "No media" : "Media required"}

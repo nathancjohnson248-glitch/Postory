@@ -10,8 +10,12 @@ export function GeneratedToast() {
   const pathname = usePathname();
   useEffect(() => {
     if (params.get("generated") !== "1") return;
-    toast.success("Your posts are ready for review.");
-    router.replace(pathname, { scroll: false });
+    if (params.get("missing")) toast.warning("Some posts need another attempt.");
+    else toast.success("Your posts are ready for review.");
+    // Keep `missing` so the retry card survives; drop only the one-shot flag.
+    const next = new URLSearchParams(params);
+    next.delete("generated");
+    router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }, [params, pathname, router]);
   return null;
 }

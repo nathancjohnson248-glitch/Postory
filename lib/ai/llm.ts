@@ -125,7 +125,7 @@ async function viaGemini<S extends z.ZodType>(input: StructuredInput<S>): Promis
     {
       systemInstruction: { parts: [{ text: input.system }] },
       contents: input.turns.map((t) => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.content }] })),
-      generationConfig: { responseMimeType: "application/json", responseJsonSchema: jsonSchemaFor(input.schema), temperature: 0.7 },
+      generationConfig: { responseMimeType: "application/json", responseJsonSchema: jsonSchemaFor(input.schema), temperature: 0.5 },
     },
     90_000,
   );
@@ -144,7 +144,7 @@ async function viaGroq<S extends z.ZodType>(input: StructuredInput<S>): Promise<
   try {
     const res = await groq().chat.completions.create({
       model: env.groqModel(),
-      temperature: 0.7,
+      temperature: 0.5,
       messages: [{ role: "system", content: input.system }, ...input.turns.map((t) => ({ role: t.role, content: t.content }))],
       response_format: { type: "json_schema", json_schema: { name: input.name, strict: true, schema: jsonSchemaFor(input.schema) } },
     });

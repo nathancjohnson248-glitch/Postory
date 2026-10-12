@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import {
   BarChart3,
+  Brain,
   CalendarDays,
   CreditCard,
   Home,
   Inbox,
   Library,
+  LifeBuoy,
   LogOut,
   Menu,
   PenLine,
@@ -59,8 +61,10 @@ export function AppShell({
   ];
   const secondary: NavItem[] = [
     ...(isAdmin ? [{ href: "/app/admin", label: "Admin", icon: ShieldCheck }] : []),
+    { href: "/app/settings#memory", label: "Business memory", icon: Brain },
     { href: "/app/settings", label: "Settings", icon: Settings },
     { href: "/app/billing", label: "Billing", icon: CreditCard },
+    { href: "/help", label: "Help", icon: LifeBuoy },
   ];
 
   const isActive = (href: string) => (href === "/app" ? pathname === "/app" : pathname === href || pathname.startsWith(`${href}/`));

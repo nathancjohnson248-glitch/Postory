@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PageHero } from "@/components/marketing/page-hero";
 
-export const metadata: Metadata = { title: "Changelog", description: "What's new in Postory, and what's next." };
+export const metadata: Metadata = { title: "Changelog", description: "What's new in Postory, and what's next.", alternates: { canonical: "/changelog" } };
 
 const ENTRIES = [
   {

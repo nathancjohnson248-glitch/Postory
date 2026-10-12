@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { setPostStatus, updatePostContent } from "@/app/_actions/posts";
 import { goToStep } from "@/app/onboarding/actions";
 import { PlatformIcon } from "@/components/brand/platform-icon";
-import { GenerationProgress, WritingMark, type StageId } from "@/components/app/create/generation-progress";
+import { GenerationProgress, NeedsDetail, WritingMark, type StageId } from "@/components/app/create/generation-progress";
 import { CharacterCount, PostPreview } from "@/components/product/post-preview";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -29,6 +29,7 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
   const [stage, setStage] = useState<StageId | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<string[]>([]);
   const [skipping, startSkip] = useTransition();
 
   const ready = text.trim().length >= 8 && platforms.length > 0 && !running && previewLeft > 0;
@@ -41,6 +42,7 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
     if (!ready) return;
     setRunning(true);
     setError(null);
+    setQuestions([]);
     setStage("understanding");
     try {
       const response = await fetch("/api/ai/generate", {
@@ -66,7 +68,12 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
           const event = JSON.parse(line);
           if (event.type === "stage") setStage(event.stage);
           else if (event.type === "error") throw new Error(event.error?.message ?? "Something went wrong.");
-          else if (event.type === "done") {
+          else if (event.type === "needs_detail") {
+            setQuestions(event.questions ?? []);
+            setRunning(false);
+            setStage(null);
+            return;
+          } else if (event.type === "done") {
             router.refresh();
             return;
           }
@@ -101,6 +108,11 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
         ) : (
           <motion.div key="compose" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.35 }}>
             {error ? <Notice tone="danger" title={error} className="mb-5" /> : null}
+            {questions.length ? (
+              <div className="mb-5">
+                <NeedsDetail questions={questions} />
+              </div>
+            ) : null}
             {previewLeft === 0 ? (
               <Notice tone="info" title="You've already tried Postory's writer." className="mb-5">
                 Start your trial to keep writing — your first story is saved in your Library.

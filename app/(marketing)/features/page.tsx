@@ -8,6 +8,7 @@ import { buttonClasses } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "Features",
   description: "Stories, platform-native posts, approval, scheduling, calendar, business memory and analytics — the publishing side of your business, handled.",
+  alternates: { canonical: "/features" },
 };
 
 const FEATURES = [
