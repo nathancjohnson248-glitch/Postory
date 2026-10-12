@@ -14,7 +14,7 @@ export type SubscriptionState = {
   cancel_at_period_end: boolean;
 } | null;
 
-export type EntitlementSource = "subscription" | "development_override" | "none";
+export type EntitlementSource = "subscription" | "development_override" | "owner" | "none";
 
 export type Entitlements = {
   active: boolean;
@@ -61,8 +61,25 @@ export function resolveEntitlements(input: {
   subscription: SubscriptionState;
   now: Date;
   devPlan?: string;
+  /** The verified owner gets the top plan's allowances without a subscription. */
+  owner?: boolean;
 }): Entitlements {
-  const { subscription: sub, now, devPlan } = input;
+  const { subscription: sub, now, devPlan, owner } = input;
+
+  if (owner) {
+    const plan = PLANS.max;
+    return {
+      active: true,
+      plan: plan.id,
+      status: "owner",
+      source: "owner",
+      trialing: false,
+      trialEndsAt: null,
+      limits: plan.limits,
+      features: plan.features,
+      usagePeriodStart: startOfUtcMonth(now),
+    };
+  }
 
   if (devPlan && isPlanId(devPlan)) {
     const plan = PLANS[devPlan];

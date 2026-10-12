@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { METRIC_LABEL, METRIC_LIMIT_KEY, type UsageMetric } from "@/lib/billing/plans";
 import { needsSync, syncSubscription } from "@/lib/billing/service";
+import { isOwnerEmail } from "@/lib/auth/admin";
 import { resolveEntitlements, type Entitlements } from "./resolve";
 
 export type { Entitlements } from "./resolve";
@@ -22,7 +23,17 @@ export const getEntitlements = cache(async (userId: string): Promise<Entitlement
     .maybeSingle();
   // No webhooks: if the mirror is stale or a trial/period just ended, re-read HandyPay first.
   const subscription = data && needsSync(data) ? ((await syncSubscription(userId, { force: true })) ?? data) : data;
-  return resolveEntitlements({ subscription, now: new Date(), devPlan: env.devPlan() });
+  return resolveEntitlements({ subscription, now: new Date(), devPlan: env.devPlan(), owner: await isVerifiedOwner(userId) });
+});
+
+/** The owner, by confirmed email read server-side from Auth — never from the browser. */
+const isVerifiedOwner = cache(async (userId: string) => {
+  try {
+    const { data } = await createAdminClient().auth.admin.getUserById(userId);
+    return Boolean(data.user?.email_confirmed_at && isOwnerEmail(data.user.email));
+  } catch {
+    return false;
+  }
 });
 
 export class EntitlementError extends Error {

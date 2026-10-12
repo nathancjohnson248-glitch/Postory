@@ -5,7 +5,7 @@ type Level = "info" | "warn" | "error";
 export type LogContext = {
   operation: string;
   userId?: string | null;
-  provider?: "letmepost" | "publora" | "postiz" | "handypay" | "openai" | "resend" | "smtp" | "zoho" | "supabase" | "privy" | "gemini" | "groq" | "openrouter" | "replicate" | "cloudflare";
+  provider?: "letmepost" | "publora" | "postiz" | "nango" | "handypay" | "openai" | "resend" | "smtp" | "zoho" | "supabase" | "privy" | "gemini" | "groq" | "openrouter" | "replicate" | "cloudflare";
   resourceId?: string | null;
   [key: string]: unknown;
 };

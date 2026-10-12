@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Check, Copy, ExternalLink, Sparkles } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,7 @@ export function InboxItem({ item, aiEnabled, when }: { item: InboxItemView; aiEn
               <Button
                 size="sm"
                 variant="ghost"
-                icon={<Sparkles className="size-3.5" />}
+                icon={<LogoMark className="size-4" blink={false} />}
                 loading={drafting}
                 onClick={() =>
                   startDraft(async () => {

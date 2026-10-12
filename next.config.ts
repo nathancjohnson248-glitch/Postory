@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
+    // Railway's builder kept a corrupted Turbopack disk cache between builds
+    // (TurbopackInternalError / "Bus error"); production builds start clean.
+    turbopackFileSystemCacheForBuild: false,
     serverActions: {
       bodySizeLimit: "12mb",
     },

@@ -7,9 +7,9 @@ import { ConfigurationError, env, integrations } from "@/lib/env";
 import { log } from "@/lib/log";
 
 /**
- * Postory's one door to a language model. Text goes to OpenRouter first
- * (Claude Sonnet for writing, Haiku for quick checks), then Replicate (also
- * Claude), Gemini, Groq and OpenAI — whichever are configured — and a provider that refuses
+ * Postory's one door to a language model. Text and images go to Replicate
+ * first (one token for both), then OpenRouter, Gemini, Groq and OpenAI —
+ * whichever are configured — and a provider that refuses
  * access is skipped for a while so people never wait on a known failure.
  * Images go to Cloudflare Workers AI, then Gemini, then OpenAI; Groq has no
  * image model. Every call asks
@@ -39,8 +39,8 @@ const BENCH_MS = 10 * 60_000;
 
 function textProviders(): TextProvider[] {
   const all: TextProvider[] = [];
-  if (integrations.openrouter()) all.push("openrouter");
   if (integrations.replicate()) all.push("replicate");
+  if (integrations.openrouter()) all.push("openrouter");
   if (integrations.gemini()) all.push("gemini");
   if (integrations.groq()) all.push("groq");
   if (integrations.openai()) all.push("openai");
@@ -235,6 +235,7 @@ async function viaReplicate<S extends z.ZodType>(input: StructuredInput<S>): Pro
       system_prompt: `${input.system}\n\nRespond with only one JSON object that matches this JSON Schema. No prose, no code fences.\n${JSON.stringify(jsonSchemaFor(input.schema))}`,
       prompt,
       max_tokens: 4000,
+      temperature: 0.5,
     },
     120_000,
   );

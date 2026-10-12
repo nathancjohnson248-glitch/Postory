@@ -35,6 +35,7 @@ export const env = {
   letmepostApiKey: () => read("LETMEPOST_API_KEY"),
   publoraApiKey: () => read("PUBLORA_API_KEY"),
   postizApiKey: () => read("POSTIZ_API_KEY"),
+  nangoSecretKey: () => read("NANGO_SECRET_KEY"),
   /** Postiz Cloud by default; a self-hosted instance is https://your-domain/api/public/v1. */
   postizApiUrl: () => (read("POSTIZ_API_URL") ?? "https://api.postiz.com/public/v1").replace(/\/+$/, ""),
   letmepostBaseUrl: () => (read("LETMEPOST_API_BASE_URL") ?? "https://api.letmepost.dev").replace(/\/+$/, ""),
@@ -56,8 +57,9 @@ export const env = {
   groqApiKey: () => read("GROQ_API_KEY"),
   groqModel: () => read("GROQ_MODEL") ?? "openai/gpt-oss-120b",
   replicateApiToken: () => read("REPLICATE_API_TOKEN"),
-  replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "anthropic/claude-sonnet-5",
-  replicateFastModel: () => read("REPLICATE_FAST_MODEL") ?? "anthropic/claude-4.5-haiku",
+  /** Meta's Llama on Replicate (llama-3.3-70b-instruct isn't hosted there; Maverick is the current flagship). */
+  replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "meta/llama-4-maverick-instruct",
+  replicateFastModel: () => read("REPLICATE_FAST_MODEL") ?? "meta/llama-4-maverick-instruct",
   replicateImageModel: () => read("REPLICATE_IMAGE_MODEL") ?? "black-forest-labs/flux-1.1-pro",
   openrouterApiKey: () => read("OPENROUTER_API_KEY"),
   /** The writer: quality first. */
@@ -104,6 +106,7 @@ export const integrations = {
   letmepost: () => Boolean(env.letmepostApiKey()),
   publora: () => Boolean(env.publoraApiKey()),
   postiz: () => Boolean(env.postizApiKey()),
+  nango: () => Boolean(env.nangoSecretKey()),
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   gemini: () => Boolean(env.geminiApiKey()),
@@ -128,6 +131,7 @@ export function integrationStatus(): IntegrationStatus {
     letmepost: integrations.letmepost(),
     publora: integrations.publora(),
     postiz: integrations.postiz(),
+    nango: integrations.nango(),
     privy: integrations.privy(),
     handypay: integrations.handypay(),
     gemini: integrations.gemini(),

@@ -13,11 +13,11 @@ import {
   ImagePlus,
   RotateCcw,
   Send,
-  Sparkles,
   Undo2,
   Upload,
   X,
 } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { CharacterCount, PostPreview } from "@/components/product/post-preview";
 import { PostStatusBadge } from "@/components/product/status-badge";
@@ -276,7 +276,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
 
         {lastChange ? (
           <p className="mt-3 flex items-start gap-2 text-[13px] text-blue-700">
-            <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <LogoMark className="mt-px size-4 shrink-0" blink={false} />
             {lastChange}
           </p>
         ) : null}
@@ -392,7 +392,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
               adapt();
             }}
           >
-            <Sparkles className="ml-2 size-4 shrink-0 text-blue-500" aria-hidden />
+            <LogoMark className="ml-1.5 size-6 shrink-0" />
             <label htmlFor={`adapt-${post.id}`} className="sr-only">
               Tell Postory what to change in the {meta.name} post
             </label>

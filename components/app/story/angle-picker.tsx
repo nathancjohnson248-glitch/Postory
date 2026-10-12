@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Sparkles } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { rewriteStoryAroundAngle } from "@/app/_actions/posts";
 import { Spinner } from "@/components/ui/button";
@@ -42,7 +42,7 @@ export function AnglePicker({ storyId, angles, current, aiEnabled }: { storyId: 
               current === a ? "bg-blue-600 text-white ring-blue-600" : "bg-blue-50 text-blue-700 ring-blue-100 hover:ring-blue-300",
             )}
           >
-            {busy === a ? <Spinner className="size-3" /> : <Sparkles className="size-3" aria-hidden />}
+            {busy === a ? <Spinner className="size-3" /> : <LogoMark className="size-3.5" blink={false} />}
             {a}
           </button>
         ) : (

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
-import { ArrowUp, CalendarClock, MessageSquareText, PenLine, Sparkles } from "lucide-react";
+import { ArrowUp, CalendarClock, PenLine } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { askAssistantAction } from "@/app/_actions/assistant";
@@ -76,8 +77,8 @@ export function AssistantPanel({
   return (
     <aside className="flex h-full min-h-[520px] flex-col rounded-3xl bg-surface shadow-soft ring-1 ring-line lg:sticky lg:top-10 lg:max-h-[calc(100dvh-5rem)]">
       <div className="flex items-start gap-3 border-b border-line px-5 py-4">
-        <span className="grid size-8 place-items-center rounded-xl bg-blue-50 text-blue-600">
-          <MessageSquareText className="size-4" aria-hidden />
+        <span className={cn("shrink-0", pending && "mark-thinking")}>
+          <LogoMark className="size-9" />
         </span>
         <div>
           <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Ask Postory</h2>
@@ -106,15 +107,16 @@ export function AssistantPanel({
 
         <AnimatePresence initial={false}>
           {messages.map((m, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-              <div className={cn("max-w-[92%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed", m.role === "user" ? "bg-ink text-white" : "bg-wash text-ink")}>
+            <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className={cn("flex items-start gap-2", m.role === "user" ? "justify-end" : "justify-start")}>
+              {m.role === "user" ? null : <LogoMark className="mt-0.5 size-7 shrink-0" blink={false} />}
+              <div className={cn("max-w-[88%] rounded-2xl px-3.5 py-2.5 text-[14px] leading-relaxed", m.role === "user" ? "bg-ink text-white" : "bg-wash text-ink")}>
                 <p className="whitespace-pre-line">{m.content}</p>
                 {m.proposals?.length ? (
                   <ul className="mt-3 flex flex-col gap-2">
                     {m.proposals.map((p, j) => {
                       const key = `${i}-${j}`;
                       const state = applied[key];
-                      const Icon = p.type === "reschedule_post" ? CalendarClock : p.type === "edit_post" ? PenLine : Sparkles;
+                      const Icon = p.type === "reschedule_post" ? CalendarClock : PenLine;
                       return (
                         <li key={key} className="flex items-center justify-between gap-3 rounded-xl bg-surface px-3 py-2 ring-1 ring-line">
                           <span className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
@@ -136,10 +138,15 @@ export function AssistantPanel({
           ))}
         </AnimatePresence>
         {pending ? (
-          <div className="flex gap-1.5 px-1" aria-label="Postory is thinking">
-            {[0, 1, 2].map((d) => (
-              <motion.span key={d} className="size-1.5 rounded-full bg-faint" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }} />
-            ))}
+          <div className="flex items-center gap-2" aria-label="Postory is thinking">
+            <span className="mark-thinking">
+              <LogoMark className="size-7" />
+            </span>
+            <span className="flex gap-1.5 rounded-full bg-wash px-3 py-2.5">
+              {[0, 1, 2].map((d) => (
+                <motion.span key={d} className="size-1.5 rounded-full bg-muted" animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }} transition={{ duration: 0.9, repeat: Infinity, delay: d * 0.15 }} />
+              ))}
+            </span>
           </div>
         ) : null}
       </div>
