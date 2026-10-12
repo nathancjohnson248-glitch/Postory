@@ -53,6 +53,8 @@ export async function getSocialReadiness(userId: string): Promise<SocialReadines
   if (!provider) return { ready: false, reason: "provider_not_configured", message: NOT_CONFIGURED };
   // One workspace for everyone; ownership of each channel is recorded in Postory.
   if (provider.sharedWorkspace) return { ready: true, workspaceId: SHARED_WORKSPACE, provider };
+  // Nango tags each connection with the Postory user, so the user id is the workspace.
+  if (provider.name === "nango") return { ready: true, workspaceId: userId, provider };
   let workspace = await getWorkspaceId(userId, provider.name);
   if (!workspace && provider.name === "publora") {
     try {
@@ -155,7 +157,8 @@ export async function listConnectedAccounts(userId: string) {
  */
 export async function startConnection(userId: string, platform: Platform, returnPath: string) {
   const { workspaceId, p } = await requireWorkspace(userId);
-  if (p.platforms && !p.platforms.includes(platform)) {
+  const supported = p.availablePlatforms ? await p.availablePlatforms() : p.platforms;
+  if (supported && !supported.includes(platform)) {
     throw new UserFacingError("platform_not_enabled", `Connecting ${PLATFORM_META[platform].name} isn't available yet. Your other networks work as normal.`);
   }
   if (p.sharedWorkspace) await assertConnectSlotFree(userId, platform);
@@ -746,6 +749,17 @@ export async function schedulePost(userId: string, postId: string, when: Date) {
     throw e;
   }) : null;
 
+  if (p.schedulesLocally) {
+    // Postory's scheduler sends it at the time; media is prepared then.
+    const { data } = await admin
+      .from("story_posts")
+      .update({ status: "scheduled", scheduled_for: when.toISOString(), external_post_id: null, provider_batch_id: null })
+      .eq("id", post.id)
+      .select("*")
+      .single();
+    return data!;
+  }
+
   try {
     const { urls } = await prepareMedia(userId, post, media, workspaceId, p);
     const result = await p.createPost({
@@ -799,15 +813,28 @@ export async function reschedulePost(userId: string, postId: string, when: Date)
     throw new UserFacingError("invalid_time", "Pick a time at least a couple of minutes from now.");
   }
   const post = await loadOwnedPost(userId, postId);
-  if (post.status !== "scheduled" || !post.external_post_id) {
+  const { workspaceId, p } = await requireWorkspace(userId);
+  if (post.status !== "scheduled" || (!post.external_post_id && !p.schedulesLocally)) {
     throw new UserFacingError("invalid_state", "Only scheduled posts can be moved.");
   }
-  const { workspaceId, p } = await requireWorkspace(userId);
+  if (p.schedulesLocally) {
+    const { data } = await createAdminClient()
+      .from("story_posts")
+      .update({ scheduled_for: when.toISOString() })
+      .eq("id", post.id)
+      .eq("user_id", userId)
+      .eq("status", "scheduled")
+      .select("*")
+      .single();
+    if (!data) throw new UserFacingError("too_late", "This post has already started publishing, so it can't be moved.");
+    return data;
+  }
   if (!p.canReschedule) {
     // No in-place move at this provider: take it off the schedule and schedule it again.
     await unschedulePost(userId, postId);
     return schedulePost(userId, postId, when);
   }
+  if (!post.external_post_id) throw new UserFacingError("invalid_state", "Only scheduled posts can be moved.");
   try {
     await p.reschedulePost(post.external_post_id, when, workspaceId);
   } catch (error) {
@@ -862,10 +889,10 @@ export async function unschedulePost(userId: string, postId: string) {
 
 async function refreshPostFromProvider(userId: string, post: StoryPost) {
   if (!post.external_post_id) return post;
-  const p = activeProvider();
-  const workspaceId = p ? await getWorkspaceId(userId, p.name) : null;
-  if (!p || !workspaceId) return post;
-  const remote = await p.getPost(post.external_post_id, workspaceId);
+  const readiness = await getSocialReadiness(userId);
+  if (!readiness.ready) return post;
+  const p = readiness.provider;
+  const remote = await p.getPost(post.external_post_id, readiness.workspaceId);
   const next = providerStatusToPostStatus(remote.status);
   const admin = createAdminClient();
   const update: Partial<StoryPost> = { status: next };
@@ -1009,4 +1036,74 @@ async function syncPostizMetrics(userId: string) {
   } catch (error) {
     log.warn("metrics sync failed", { operation: "social.metrics", userId, provider: "postiz" }, error);
   }
+}
+
+/**
+ * Postory's own scheduler, for providers that only publish (Nango). Sends every
+ * scheduled post whose time has come. Each post is claimed with a status
+ * compare-and-set, so concurrent runs can never send the same post twice.
+ */
+export async function publishDueScheduledPosts(limit = 20) {
+  const p = activeProvider();
+  if (!p?.schedulesLocally) return 0;
+  const admin = createAdminClient();
+  const { data: due } = await admin
+    .from("story_posts")
+    .select("*")
+    .eq("status", "scheduled")
+    .is("external_post_id", null)
+    .lte("scheduled_for", new Date().toISOString())
+    .order("scheduled_for", { ascending: true })
+    .limit(limit);
+
+  let sent = 0;
+  for (const post of due ?? []) {
+    const { data: claimed } = await admin
+      .from("story_posts")
+      .update({ status: "publishing", publish_attempts: post.publish_attempts + 1 })
+      .eq("id", post.id)
+      .eq("status", "scheduled")
+      .select("id")
+      .maybeSingle();
+    if (!claimed) continue;
+
+    try {
+      const account = await loadPublishTarget(post.user_id, post);
+      const media = parseMedia(post.media);
+      const { urls } = await prepareMedia(post.user_id, post, media, post.user_id, p);
+      const result = await p.createPost({
+        accountExternalId: account.external_account_id,
+        platform: post.platform as Platform,
+        text: post.content,
+        media: [],
+        mediaUrls: urls,
+        externalProfileId: post.user_id,
+        idempotencyKey: post.idempotency_key,
+        providerHint: providerHintFor(account),
+      });
+      await admin
+        .from("story_posts")
+        .update({
+          status: "published",
+          published_at: new Date().toISOString(),
+          external_post_id: result.externalPostId,
+          external_url: webUrl(result.uri),
+          platform_post_id: result.platformPostId ?? null,
+          error_code: null,
+          error_message: null,
+        })
+        .eq("id", post.id);
+      sent += 1;
+    } catch (error) {
+      const userError = toUserError(error, post.platform, "publish");
+      const message = userError?.message ?? "Publishing failed. Try again.";
+      await admin
+        .from("story_posts")
+        .update({ status: "failed", error_code: userError?.code ?? "unknown_error", error_message: message, idempotency_key: crypto.randomUUID() })
+        .eq("id", post.id);
+      log.error("scheduled publish failed", { operation: "social.publishDue", userId: post.user_id, provider: p.name, resourceId: post.id, platform: post.platform }, error);
+      notifyUser(post.user_id, "publishFailed", { network: PLATFORM_META[post.platform as Platform]?.name ?? post.platform, reason: message, storyId: post.story_id });
+    }
+  }
+  return sent;
 }

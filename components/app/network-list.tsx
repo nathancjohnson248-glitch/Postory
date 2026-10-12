@@ -28,12 +28,15 @@ export function NetworkList({
   readiness,
   returnPath,
   unavailable = [],
+  connectInPage = false,
 }: {
   rows: NetworkRow[];
   readiness: { ready: boolean; message?: string };
   returnPath: "/onboarding" | "/app/connections";
   /** Networks the publishing provider can't connect yet; shown honestly instead of a failing button. */
   unavailable?: Platform[];
+  /** Connecting happens in an overlay on this page (Nango), so no tab is opened. */
+  connectInPage?: boolean;
 }) {
   const router = useRouter();
   const [connecting, setConnecting] = useState<Platform | null>(null);
@@ -47,12 +50,41 @@ export function NetworkList({
     setConnecting(platform);
     setRowErrors((e) => ({ ...e, [platform]: undefined }));
     // Open the tab during the click so pop-up blockers allow it; point it at the link once it's ready.
-    const tab = window.open("about:blank", "_blank");
+    const tab = connectInPage ? null : window.open("about:blank", "_blank");
     const result = await connectNetwork(platform, returnPath);
     if (!result.ok) {
       tab?.close();
       setConnecting(null);
       setRowErrors((e) => ({ ...e, [platform]: result.error.message }));
+      return;
+    }
+    if (result.data.kind === "session") {
+      // Nango's Connect UI opens over the page; the popup we opened isn't needed.
+      tab?.close();
+      const attemptId = result.data.attemptId;
+      const { default: Nango } = await import("@nangohq/frontend");
+      let finished = false;
+      new Nango().openConnectUI({
+        sessionToken: result.data.token,
+        onEvent: async (event) => {
+          if (event.type === "connect" && !finished) {
+            finished = true;
+            const done = await finishConnection(attemptId);
+            setConnecting(null);
+            if (!done.ok) {
+              setRowErrors((e) => ({ ...e, [platform]: done.error.message }));
+              return;
+            }
+            toast.success(done.data.connected === 1 ? `${PLATFORM_META[platform].name} connected.` : `${done.data.connected} accounts connected.`);
+            router.refresh();
+          } else if (event.type === "close" && !finished) {
+            setConnecting(null);
+          } else if (event.type === "error") {
+            setConnecting(null);
+            setRowErrors((e) => ({ ...e, [platform]: event.payload.errorMessage || "The connection didn't finish. Try again." }));
+          }
+        },
+      });
       return;
     }
     if (result.data.kind === "redirect") {

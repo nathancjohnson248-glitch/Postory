@@ -16,6 +16,8 @@ export type ProviderAccount = {
 
 export type ConnectDescriptor =
   | { kind: "redirect"; url: string; availability: "stable" | "trial" | "pending"; newTab?: boolean }
+  /** A token for an in-page connect UI (Nango); the browser reports when it's done. */
+  | { kind: "session"; token: string; availability: "stable" | "trial" | "pending" }
   | { kind: "credentials"; fields: { name: string; label: string; type: string }[]; availability: "stable" | "trial" | "pending" };
 
 export type ProviderMedia = { kind: "image" | "video"; mediaId: string; altText?: string };

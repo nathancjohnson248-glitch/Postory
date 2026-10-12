@@ -14,9 +14,9 @@ export async function connectNetwork(platform: string, returnPath: string) {
     const parsed = platformSchema.safeParse(platform);
     if (!parsed.success) throw new UserFacingError("invalid_platform", "Unknown network.");
     const { attemptId, descriptor } = await social.startConnection(user.id, parsed.data, returnPathSchema.parse(returnPath));
-    return descriptor.kind === "redirect"
-      ? { kind: "redirect" as const, url: descriptor.url, attemptId, newTab: Boolean(descriptor.newTab) }
-      : { kind: "credentials" as const, attemptId, fields: descriptor.fields };
+    if (descriptor.kind === "redirect") return { kind: "redirect" as const, url: descriptor.url, attemptId, newTab: Boolean(descriptor.newTab) };
+    if (descriptor.kind === "session") return { kind: "session" as const, token: descriptor.token, attemptId };
+    return { kind: "credentials" as const, attemptId, fields: descriptor.fields };
   });
 }
 

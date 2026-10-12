@@ -35,6 +35,10 @@ export const PROVIDER_PLATFORM: Record<string, Platform> = {
 type Options = { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; json?: unknown; headers?: Record<string, string>; timeoutMs?: number; body?: BodyInit };
 
 async function call<T>(url: string, options: Options = {}): Promise<T> {
+  return (await callWithHeaders<T>(url, options)).body;
+}
+
+async function callWithHeaders<T>(url: string, options: Options = {}): Promise<{ body: T; headers: Headers }> {
   const key = env.nangoSecretKey();
   if (!key) throw new ConfigurationError("NANGO_SECRET_KEY");
   const method = options.method ?? "GET";
@@ -63,7 +67,7 @@ async function call<T>(url: string, options: Options = {}): Promise<T> {
   } catch {
     body = { message: text.slice(0, 300) };
   }
-  if (res.ok) return body as T;
+  if (res.ok) return { body: body as T, headers: res.headers };
 
   const message = describe(body) ?? `The network returned HTTP ${res.status}.`;
   log.warn("nango error response", { operation: `${method} ${path}`, provider: "nango", status: res.status });
@@ -123,17 +127,21 @@ export async function availablePlatforms(): Promise<Platform[]> {
 
 // --- Connections ----------------------------------------------------------------
 
-/** POST /connect/sessions — a short-lived hosted link where the user connects one network. */
-export async function connectLink(userId: string, email: string | null, platform: Platform) {
+/**
+ * POST /connect/sessions — a short-lived token for Nango's Connect UI (opened
+ * in the browser with @nangohq/frontend), limited to one network and tagged
+ * with the Postory user so the connection is theirs.
+ */
+export async function connectSessionToken(userId: string, platform: Platform) {
   const key = (await configuredIntegrations()).get(platform);
   if (!key) return null;
-  const res = await call<{ data?: { connect_link?: string; token?: string } }>(`${BASE}/connect/sessions`, {
+  const res = await call<{ data?: { token?: string } }>(`${BASE}/connect/sessions`, {
     method: "POST",
-    json: { tags: { end_user_id: userId, ...(email ? { end_user_email: email } : {}) }, allowed_integrations: [key] },
+    json: { tags: { end_user_id: userId }, allowed_integrations: [key] },
   });
-  const link = res.data?.connect_link;
-  if (!link) throw new SocialProviderError("unexpected_response", "Couldn't start the connection. Try again.");
-  return link;
+  const token = res.data?.token;
+  if (!token) throw new SocialProviderError("unexpected_response", "Couldn't start the connection. Try again.");
+  return token;
 }
 
 export type NangoConnection = { connectionId: string; providerConfigKey: string; provider: string; platform: Platform; created: string; broken: boolean };
@@ -175,6 +183,22 @@ export function proxy<T>(target: ProxyTarget, path: string, options: Options & {
     ...options.headers,
   };
   return call<T>(`${BASE}/proxy${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, timeoutMs: options.timeoutMs ?? 60_000 });
+}
+
+/** Same as proxy(), with the response headers (LinkedIn returns the new post id in one). */
+export function proxyWithHeaders<T>(target: ProxyTarget, path: string, options: Options = {}) {
+  const headers: Record<string, string> = { "Provider-Config-Key": target.providerConfigKey, "Connection-Id": target.connectionId, ...options.headers };
+  return callWithHeaders<T>(`${BASE}/proxy${path.startsWith("/") ? path : `/${path}`}`, { ...options, headers, timeoutMs: options.timeoutMs ?? 60_000 });
+}
+
+/** GET /connections/{id} — the live access token, for uploads that can't go through the proxy (LinkedIn's upload host). */
+export async function accessToken(target: ProxyTarget) {
+  const res = await call<{ credentials?: { access_token?: string } }>(
+    `${BASE}/connections/${encodeURIComponent(target.connectionId)}?provider_config_key=${encodeURIComponent(target.providerConfigKey)}`,
+  );
+  const token = res.credentials?.access_token;
+  if (!token) throw new SocialProviderError("platform_auth_failed", "This connection needs to be reconnected.");
+  return token;
 }
 
 /** Account ids are stored as "<integration key>:<connection id>". */

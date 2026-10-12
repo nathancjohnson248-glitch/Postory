@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { KeyRound, ShieldCheck, Store, ThumbsUp } from "lucide-react";
 import { NetworkList } from "@/components/app/network-list";
-import { unavailablePlatforms } from "@/lib/social/availability";
+import { connectsInPage, unavailablePlatforms } from "@/lib/social/availability";
 import { PageHeader } from "@/components/app/section";
 import { ConnectionReturnToast } from "@/components/onboarding/return-notices";
 import { requireAppAccess } from "@/lib/auth/access";
@@ -58,7 +58,7 @@ export default async function ConnectionsPage() {
       </dl>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <NetworkList rows={networks} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/app/connections" unavailable={unavailablePlatforms()} />
+        <NetworkList rows={networks} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/app/connections" unavailable={await unavailablePlatforms()} connectInPage={connectsInPage()} />
 
         <aside className="flex flex-col gap-3 lg:sticky lg:top-10 lg:self-start">
           <h2 className="px-1 text-[13px] font-semibold text-ink-soft">Before you connect</h2>

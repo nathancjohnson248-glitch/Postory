@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { adaptPost } from "@/lib/ai/adapt-post";
 import { factCorpus, loadBusinessContext } from "@/lib/ai/context";
-import { generateImage } from "@/lib/ai/generate-image";
+import { createPostVisual } from "@/lib/ai/post-visual";
 import { generatePosts } from "@/lib/ai/generate-posts";
 import { consumeUsage, getEntitlements } from "@/lib/entitlements";
 import { UserFacingError } from "@/lib/errors";
@@ -308,34 +308,9 @@ export async function generateImageAction(input: { postId: string; direction?: s
     const direction = z.string().trim().max(400).optional().parse(input.direction);
     const orientation = z.enum(["square", "portrait", "landscape"]).catch("square").parse(input.orientation);
 
-    const entitlements = await getEntitlements(user.id);
-    const usage = await consumeUsage(user.id, entitlements, "ai_image");
-    try {
-      const context = await loadBusinessContext(user.id);
-      const image = await generateImage({
-        story: post.stories?.source_text ?? "",
-        post: post.content,
-        suggestion: post.media_suggestion,
-        businessName: context.businessName,
-        direction,
-        orientation,
-      });
-      const id = crypto.randomUUID();
-      const path = `${user.id}/${post.id}/${id}.${image.extension}`;
-      const admin = createAdminClient();
-      const { error } = await admin.storage.from(MEDIA_BUCKET).upload(path, image.bytes, { contentType: image.contentType });
-      if (error) throw new Error("Could not store the generated image.");
-      const media = [
-        ...parseMedia(post.media),
-        { id, kind: "image" as const, storagePath: path, contentType: image.contentType, source: "ai" as const, createdAt: new Date().toISOString() },
-      ];
-      await saveMedia(user.id, post.id, media);
-      refresh(post.story_id);
-      return { mediaId: id };
-    } catch (error) {
-      await usage.release();
-      throw error;
-    }
+    const result = await createPostVisual(user.id, post, { direction, orientation });
+    refresh(post.story_id);
+    return result;
   });
 }
 

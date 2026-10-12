@@ -2,7 +2,9 @@ import "server-only";
 
 import { integrations } from "@/lib/env";
 import * as letmepost from "./letmepost";
+import * as nango from "./nango";
 import * as postiz from "./postiz";
+import * as publishers from "./publishers";
 import * as publora from "./publora";
 import type { Platform } from "./platforms";
 import type { ConnectDescriptor, ProviderAccount, ProviderPost, PublishRequest, PublishResult } from "./types";
@@ -12,7 +14,7 @@ import type { ConnectDescriptor, ProviderAccount, ProviderPost, PublishRequest, 
  * when configured (each Postory user connects their own accounts through it);
  * LetMePost remains for deployments that use it.
  */
-export type ProviderName = "postiz" | "publora" | "letmepost";
+export type ProviderName = "nango" | "postiz" | "publora" | "letmepost";
 
 export type SocialProviderApi = {
   name: ProviderName;
@@ -25,6 +27,10 @@ export type SocialProviderApi = {
   platforms?: Platform[];
   /** Moves a scheduled post in place. Without it, Postory replaces the post. */
   canReschedule?: boolean;
+  /** Networks set up right now, when that's only known at runtime (Nango integrations). */
+  availablePlatforms?: () => Promise<Platform[]>;
+  /** The provider only publishes; Postory's own scheduler sends scheduled posts at their time. */
+  schedulesLocally?: boolean;
   /** How media reaches the provider: uploaded by Postory, or fetched by the provider from short-lived URLs. */
   media: "upload" | "urls";
   /** Whether a scheduled post may carry media. */
@@ -42,6 +48,53 @@ export type SocialProviderApi = {
 
 const unsupported = async (): Promise<never> => {
   throw new Error("Not supported by this provider.");
+};
+
+/** Nango holds the tokens; Postory posts through each network's own API and schedules itself. */
+const NANGO: SocialProviderApi = {
+  name: "nango",
+  canReschedule: true,
+  schedulesLocally: true,
+  availablePlatforms: () => nango.availablePlatforms(),
+  media: "urls",
+  schedulesMedia: true,
+  listAccounts: async (userId) => {
+    const connections = await nango.listConnections(userId);
+    return Promise.all(
+      connections.map(async (c): Promise<ProviderAccount> => {
+        const target = { connectionId: c.connectionId, providerConfigKey: c.providerConfigKey };
+        const who = c.broken ? null : await publishers.profile(c.platform, target).catch(() => null);
+        return {
+          externalId: nango.packAccountId(target),
+          platform: c.platform,
+          displayName: who?.username ? `@${who.username}` : (who?.name ?? null),
+          externalProfileId: userId,
+          platformAccountId: who?.id ?? c.connectionId,
+          tokenExpiresAt: null,
+          needsReconnect: c.broken || who === null,
+          metadata: { name: who?.name ?? null, username: who?.username ?? null, picture: who?.avatar ?? null, nangoProvider: c.provider },
+        };
+      }),
+    );
+  },
+  startConnect: async (platform, input) => {
+    const token = await nango.connectSessionToken(input.profileId, platform);
+    return token ? { kind: "session", token, availability: "stable" } : { kind: "redirect", url: "", availability: "pending" };
+  },
+  completeCredentialsConnect: unsupported,
+  disconnectAccount: (id) => {
+    const t = nango.unpackAccountId(id);
+    return nango.deleteConnection(t.connectionId, t.providerConfigKey);
+  },
+  uploadMedia: unsupported,
+  createPost: async (input) => {
+    const published = await publishers.publish(input.platform, nango.unpackAccountId(input.accountExternalId), input.text, input.mediaUrls?.[0] ?? null);
+    return { status: "published", externalPostId: published.postId, platformPostId: published.postId, batchId: null, uri: published.url, warnings: [], error: null };
+  },
+  getPost: unsupported,
+  // Scheduling is Postory's own, so there's nothing to move or cancel at the provider.
+  reschedulePost: async () => undefined,
+  cancelPost: async () => undefined,
 };
 
 const POSTIZ: SocialProviderApi = {
@@ -96,6 +149,7 @@ const LETMEPOST: SocialProviderApi = {
 };
 
 export function activeProvider(): SocialProviderApi | null {
+  if (integrations.nango()) return NANGO;
   if (integrations.postiz()) return POSTIZ;
   if (integrations.publora()) return PUBLORA;
   if (integrations.letmepost()) return LETMEPOST;
