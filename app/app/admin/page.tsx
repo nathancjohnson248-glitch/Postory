@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Mail } from "lucide-react";
 import { PageHeader } from "@/components/app/section";
 import { BarList } from "@/components/app/analytics/bar-list";
 import { ColumnChart } from "@/components/app/analytics/column-chart";
@@ -28,6 +30,13 @@ export default async function AdminPage() {
       <PageHeader
         eyebrow={role === "owner" ? "Owner" : "Admin"}
         title="Business at a glance"
+        actions={
+          role === "owner" ? (
+            <Link href="/app/admin/mail" className="inline-flex h-10 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-medium shadow-hairline transition-colors hover:bg-wash">
+              <Mail className="size-4" aria-hidden /> Mail
+            </Link>
+          ) : undefined
+        }
         description={
           data.revenueSource === "handypay"
             ? "Subscriptions are read live from HandyPay each time this page loads. Only Postory staff can see it."

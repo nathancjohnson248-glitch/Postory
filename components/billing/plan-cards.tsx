@@ -26,7 +26,7 @@ export function PlanCards({
             key={id}
             className={cn(
               "relative flex flex-col rounded-3xl p-6",
-              featured ? "order-first bg-ink text-white shadow-float lg:order-none lg:-my-3 lg:py-9" : "bg-surface text-ink shadow-soft ring-1 ring-line",
+              featured ? "bg-ink text-white shadow-float lg:-my-3 lg:py-9" : "bg-surface text-ink shadow-soft ring-1 ring-line",
             )}
           >
             <div className="flex items-center justify-between">
