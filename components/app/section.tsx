@@ -44,11 +44,21 @@ export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?:
   return (
     <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between lg:mb-10">
       <div className="min-w-0">
-        {eyebrow ? <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">{eyebrow}</p> : null}
-        <h1 className="font-display text-[44px] leading-[0.98] tracking-[-0.02em] text-ink text-balance sm:text-[56px]">{title}</h1>
-        {description ? <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted text-pretty">{description}</p> : null}
+        {eyebrow ? <p className="fade-rise mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">{eyebrow}</p> : null}
+        <h1 className="fade-rise font-display text-[44px] leading-[0.98] tracking-[-0.02em] text-ink text-balance sm:text-[56px]" style={{ animationDelay: "0.04s" }}>
+          {title}
+        </h1>
+        {description ? (
+          <p className="fade-rise mt-3 max-w-xl text-[15px] leading-relaxed text-muted text-pretty" style={{ animationDelay: "0.1s" }}>
+            {description}
+          </p>
+        ) : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="fade-rise flex shrink-0 flex-wrap items-center gap-2" style={{ animationDelay: "0.14s" }}>
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }

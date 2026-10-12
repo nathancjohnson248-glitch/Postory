@@ -78,7 +78,7 @@ export function NetworkList({
         </Notice>
       ) : null}
 
-      <ul className="divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-soft ring-1 ring-line">
+      <ul className="stagger-in divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-soft ring-1 ring-line">
         {rows.map((row) => {
           const meta = PLATFORM_META[row.platform];
           const connected = row.accounts.filter((a) => a.status === "connected");

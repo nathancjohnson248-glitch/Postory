@@ -3,9 +3,15 @@ import type { ReactNode } from "react";
 export function PageHero({ eyebrow, title, body }: { eyebrow: string; title: ReactNode; body?: ReactNode }) {
   return (
     <section className="mx-auto max-w-7xl px-5 pb-12 pt-16 sm:px-8 sm:pt-24">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
-      <h1 className="mt-5 max-w-4xl font-display text-[52px] leading-[0.96] tracking-[-0.025em] text-balance sm:text-[84px]">{title}</h1>
-      {body ? <p className="mt-6 max-w-2xl text-[18px] leading-relaxed text-muted text-pretty">{body}</p> : null}
+      <p className="fade-rise font-mono text-[11px] uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
+      <h1 className="fade-rise mt-5 max-w-4xl font-display text-[52px] leading-[0.96] tracking-[-0.025em] text-balance sm:text-[84px]" style={{ animationDelay: "0.06s" }}>
+        {title}
+      </h1>
+      {body ? (
+        <p className="fade-rise mt-6 max-w-2xl text-[18px] leading-relaxed text-muted text-pretty" style={{ animationDelay: "0.16s" }}>
+          {body}
+        </p>
+      ) : null}
     </section>
   );
 }

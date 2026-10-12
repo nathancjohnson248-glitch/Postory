@@ -189,7 +189,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Prom
       )}
 
       {stories.length ? (
-        <ul className="grid gap-3">
+        <ul className="stagger-in grid gap-3">
           {stories.map((s) => (
             <li key={s.id}>
               <Link

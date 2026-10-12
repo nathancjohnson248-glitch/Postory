@@ -100,7 +100,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Section title="Stories that travelled furthest" description="By number of networks published to.">
               {data.topStories.length ? (
-                <ul className="flex flex-col px-2 pb-2">
+                <ul className="stagger-in flex flex-col px-2 pb-2">
                   {data.topStories.map((s) => (
                     <li key={s.storyId}>
                       <Link href={`/app/library/${s.storyId}`} className="flex items-center justify-between gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-wash">

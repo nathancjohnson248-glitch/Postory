@@ -117,7 +117,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
           <Section title="Recent stories" href="/app/library">
             {data.stories.length ? (
-              <ul className="flex flex-col">
+              <ul className="stagger-in flex flex-col">
                 {data.stories.map((story) => {
                   const posts = (story.story_posts ?? []) as { platform: string; status: string }[];
                   return (
@@ -148,7 +148,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
           <Section title="Networks" href="/app/settings#accounts" hrefLabel="Manage">
             {connected.length ? (
-              <ul className="flex flex-col gap-0.5 px-2 pb-2">
+              <ul className="stagger-in flex flex-col gap-0.5 px-2 pb-2">
                 {connected.map((a) => (
                   <li key={a.id} className="flex items-center gap-3 rounded-xl px-2 py-2">
                     <PlatformIcon platform={a.platform} tile className="size-7 rounded-lg" />

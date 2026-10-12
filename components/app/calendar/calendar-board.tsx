@@ -352,7 +352,7 @@ function Agenda({ byDay, timezone, onOpen }: { byDay: Map<string, PostView[]>; t
           <h3 className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
             {formatInZone(new Date(`${key}T12:00:00Z`), "UTC", { weekday: "long", month: "long", day: "numeric" })}
           </h3>
-          <ul className="rounded-3xl bg-surface p-2 shadow-soft ring-1 ring-line">
+          <ul className="stagger-in rounded-3xl bg-surface p-2 shadow-soft ring-1 ring-line">
             {byDay.get(key)!.map((p) => (
               <li key={p.id}>
                 <button type="button" onClick={() => onOpen(p)} className="flex w-full items-center gap-3.5 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-wash">
