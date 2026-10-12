@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { Check } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
 export const GENERATION_STAGES = [
@@ -12,6 +13,25 @@ export const GENERATION_STAGES = [
 ] as const;
 
 export type StageId = (typeof GENERATION_STAGES)[number]["id"];
+
+/** Postory at work: the mark bobs and its eyes glance across the page as it reads. */
+export function WritingMark({ title = "Postory is writing", note = "Usually 15–30 seconds." }: { title?: string; note?: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <motion.span
+        className="mark-thinking grid size-11 place-items-center rounded-2xl bg-blue-50 ring-1 ring-blue-100"
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <LogoMark className="size-8" />
+      </motion.span>
+      <div>
+        <p className="text-[15px] font-semibold">{title}</p>
+        <p className="text-[13px] text-muted">{note}</p>
+      </div>
+    </div>
+  );
+}
 
 /** Each step lights up when the server reports it — no simulated progress. */
 export function GenerationProgress({ current }: { current: StageId | null }) {

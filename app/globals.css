@@ -267,3 +267,48 @@
     transform: translateX(310%);
   }
 }
+
+/* The Postory mark blinks: eyes squeeze to a ~2px line, every 4s. */
+.mark-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mark-blink 4s ease-in-out infinite;
+}
+@keyframes mark-blink {
+  0%,
+  88%,
+  100% {
+    scale: 1 1;
+  }
+  91%,
+  93% {
+    scale: 1 0.14;
+  }
+  96% {
+    scale: 1 1;
+  }
+}
+/* While Postory is working, its eyes glance across the page as it reads. */
+.mark-thinking .mark-blink {
+  animation:
+    mark-blink 4s ease-in-out infinite,
+    mark-look 2.6s ease-in-out infinite;
+}
+@keyframes mark-look {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  25% {
+    translate: -3px 1px;
+  }
+  60% {
+    translate: 2.5px 1px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mark-blink,
+  .mark-thinking .mark-blink {
+    animation: none;
+  }
+}

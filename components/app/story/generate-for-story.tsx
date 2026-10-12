@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
-import { GenerationProgress, type StageId } from "@/components/app/create/generation-progress";
+import { GenerationProgress, WritingMark, type StageId } from "@/components/app/create/generation-progress";
 import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +57,8 @@ export function GenerateForStory({ storyId, defaultPlatforms, enabled, reason }:
       <p className="mt-1 text-[13.5px] text-muted">This story is saved. Choose networks and Postory will write a version for each.</p>
       {error ? <Notice tone="danger" title={error} className="mt-4" /> : null}
       {running ? (
-        <div className="mt-5">
+        <div className="mt-5 flex flex-col gap-6">
+          <WritingMark />
           <GenerationProgress current={stage} />
         </div>
       ) : (
@@ -81,7 +82,7 @@ export function GenerateForStory({ storyId, defaultPlatforms, enabled, reason }:
           </div>
           <div className="mt-5 flex items-center justify-between gap-3">
             <p className="text-[13px] text-muted">{enabled ? "Uses one AI generation." : reason}</p>
-            <Button variant="accent" icon={<Sparkles className="size-4" />} disabled={!enabled || !platforms.length} onClick={run}>
+            <Button variant="accent" icon={<LogoMark className="size-[18px]" blink={false} />} disabled={!enabled || !platforms.length} onClick={run}>
               Generate posts
             </Button>
           </div>

@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Mic, PenLine, Sparkles } from "lucide-react";
+import { Mic, PenLine } from "lucide-react";
+import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
 import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 import { createManualStory } from "@/app/_actions/stories";
-import { GenerationProgress, type StageId } from "./generation-progress";
+import { GenerationProgress, WritingMark, type StageId } from "./generation-progress";
 import { useDictation } from "./use-dictation";
 
 export type GenerationAvailability =
@@ -201,8 +202,9 @@ export function Composer({
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line"
+            className="flex flex-col gap-6 rounded-3xl bg-surface p-6 shadow-soft ring-1 ring-line"
           >
+            <WritingMark />
             <GenerationProgress current={stage} />
           </motion.div>
         ) : (
@@ -264,7 +266,7 @@ export function Composer({
                   Write posts myself
                 </Button>
                 {availability.ok ? (
-                  <Button size="lg" variant="accent" disabled={!canGenerate} onClick={generate} icon={<Sparkles className="size-4" />}>
+                  <Button size="lg" variant="accent" disabled={!canGenerate} onClick={generate} icon={<LogoMark className="size-[18px]" blink={false} />}>
                     Generate posts
                   </Button>
                 ) : null}

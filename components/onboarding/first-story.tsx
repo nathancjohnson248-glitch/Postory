@@ -3,12 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Check, PenLine, Sparkles } from "lucide-react";
+import { ArrowRight, Check, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { setPostStatus, updatePostContent } from "@/app/_actions/posts";
 import { goToStep } from "@/app/onboarding/actions";
 import { PlatformIcon } from "@/components/brand/platform-icon";
-import { GenerationProgress, type StageId } from "@/components/app/create/generation-progress";
+import { GenerationProgress, WritingMark, type StageId } from "@/components/app/create/generation-progress";
 import { CharacterCount, PostPreview } from "@/components/product/post-preview";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -92,15 +92,8 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             className="rounded-3xl bg-surface p-7 shadow-lift ring-1 ring-line sm:p-9"
           >
-            <div className="mb-7 flex items-center gap-3">
-              <span className="relative grid size-10 place-items-center rounded-2xl bg-blue-600 text-white">
-                <Sparkles className="size-5" aria-hidden />
-                <span className="absolute inset-0 animate-ping rounded-2xl bg-blue-500/30" aria-hidden />
-              </span>
-              <div>
-                <p className="text-[15px] font-semibold">Postory is writing</p>
-                <p className="text-[13px] text-muted">Usually 15–30 seconds.</p>
-              </div>
+            <div className="mb-7">
+              <WritingMark />
             </div>
             <blockquote className="mb-7 border-l-2 border-blue-200 pl-4 font-display text-[22px] leading-snug text-ink-soft">“{text.trim()}”</blockquote>
             <GenerationProgress current={stage} />
