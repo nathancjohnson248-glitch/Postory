@@ -27,7 +27,7 @@ function layout({ preheader, body, footerNote }: { preheader: string; body: stri
 <tr><td align="center" style="padding:32px 16px;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background:#ffffff;border:1px solid ${LINE};border-radius:20px;">
 <tr><td style="padding:28px 36px 22px 36px;border-bottom:1px solid ${LINE};">
-<a href="${ASSETS}" style="text-decoration:none;"><img src="${ASSETS}/brand/email-logo.png" width="106" height="28" alt="Postory" style="display:block;border:0;height:28px;width:106px;"></a>
+<a href="${ASSETS}" style="text-decoration:none;"><img src="${ASSETS}/brand/email-logo.png" width="102" height="28" alt="Postory" style="display:block;border:0;height:28px;width:102px;"></a>
 </td></tr>
 <tr><td style="padding:32px 36px 36px 36px;font-family:${FONT};color:${SOFT};font-size:16px;line-height:1.65;">
 ${body}
