@@ -17,5 +17,5 @@ export async function POST(request: NextRequest) {
   }
   if (!integrations.email()) return NextResponse.json({ ok: false, reason: "no_sender_configured" });
   const result = await sendEmail(OWNER_EMAILS[0], "deliveryTest", { sentAt: new Date().toUTCString() });
-  return NextResponse.json({ ok: result.sent, provider: integrations.smtp() ? "smtp" : "resend", ...("reason" in result ? { reason: result.reason } : {}) });
+  return NextResponse.json({ ok: result.sent, provider: integrations.zoho() ? "zoho" : integrations.smtp() ? "smtp" : "resend", ...("reason" in result ? { reason: result.reason } : {}) });
 }

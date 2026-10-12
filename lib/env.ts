@@ -51,6 +51,14 @@ export const env = {
   smtpUser: () => read("SMTP_USER"),
   smtpPassword: () => read("SMTP_PASSWORD"),
   smtpFrom: () => read("SMTP_FROM") ?? read("SMTP_USER"),
+  // Zoho Mail over its HTTPS API (Railway blocks SMTP below Pro).
+  zohoClientId: () => read("ZOHO_CLIENT_ID"),
+  zohoClientSecret: () => read("ZOHO_CLIENT_SECRET"),
+  zohoRefreshToken: () => read("ZOHO_REFRESH_TOKEN"),
+  zohoAccountId: () => read("ZOHO_ACCOUNT_ID"),
+  zohoFrom: () => read("ZOHO_FROM") ?? "Postory <mail@postory.lol>",
+  zohoAccountsUrl: () => (read("ZOHO_ACCOUNTS_URL") ?? "https://accounts.zoho.com").replace(/\/+$/, ""),
+  zohoMailUrl: () => (read("ZOHO_MAIL_URL") ?? "https://mail.zoho.com").replace(/\/+$/, ""),
   /** Sign-up and reset codes by email; switched on only once delivery is confirmed. */
   authEmailCodes: () => read("AUTH_EMAIL_CODES") === "on",
   emailTestToken: () => read("EMAIL_TEST_TOKEN"),
@@ -66,8 +74,9 @@ export const integrations = {
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
-  /** Postory can send email from its own address (Resend or SMTP). */
-  email: () => integrations.resend() || integrations.smtp(),
+  zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
+  /** Postory can send email from its own address (Zoho, SMTP or Resend). */
+  email: () => integrations.zoho() || integrations.smtp() || integrations.resend(),
 };
 
 export type IntegrationStatus = Record<keyof typeof integrations, boolean>;
@@ -81,6 +90,7 @@ export function integrationStatus(): IntegrationStatus {
     openai: integrations.openai(),
     resend: integrations.resend(),
     smtp: integrations.smtp(),
+    zoho: integrations.zoho(),
     email: integrations.email(),
   };
 }

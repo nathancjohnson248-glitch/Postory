@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { env, integrations } from "@/lib/env";
 import { log } from "@/lib/log";
 import { templates, type EmailTemplate, type TemplateInput } from "./templates";
+import { sendViaZoho } from "./zoho";
 
 let smtp: Transporter | null = null;
 let resend: Resend | null = null;
@@ -23,8 +24,8 @@ function smtpTransport() {
 }
 
 /**
- * Send a transactional email from Postory's own address — through the
- * configured SMTP mailbox (e.g. Zoho Mail), or Resend if that's what's set.
+ * Send a transactional email from Postory's own address — through Zoho
+ * Mail's API, an SMTP mailbox, or Resend, whichever is configured.
  * Email is never a blocker: when no sender is configured the send is skipped
  * and logged, and callers carry on.
  */
@@ -35,6 +36,17 @@ export async function sendEmail<T extends EmailTemplate>(to: string | null | und
     return { sent: false as const, reason: "not_configured" };
   }
   const { subject, html, text } = templates[template](input as never);
+
+  if (integrations.zoho()) {
+    try {
+      const messageId = await sendViaZoho({ to, subject, html });
+      log.info("email sent", { operation: "email.send", provider: "zoho", template, response: messageId ?? "" });
+      return { sent: true as const };
+    } catch (error) {
+      log.warn("email failed", { operation: "email.send", provider: "zoho", template }, error);
+      return { sent: false as const, reason: "error" };
+    }
+  }
 
   if (integrations.smtp()) {
     try {

@@ -5,7 +5,7 @@ type Level = "info" | "warn" | "error";
 export type LogContext = {
   operation: string;
   userId?: string | null;
-  provider?: "letmepost" | "handypay" | "openai" | "resend" | "smtp" | "supabase";
+  provider?: "letmepost" | "handypay" | "openai" | "resend" | "smtp" | "zoho" | "supabase";
   resourceId?: string | null;
   [key: string]: unknown;
 };
