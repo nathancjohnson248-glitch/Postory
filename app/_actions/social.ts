@@ -15,8 +15,18 @@ export async function connectNetwork(platform: string, returnPath: string) {
     if (!parsed.success) throw new UserFacingError("invalid_platform", "Unknown network.");
     const { attemptId, descriptor } = await social.startConnection(user.id, parsed.data, returnPathSchema.parse(returnPath));
     return descriptor.kind === "redirect"
-      ? { kind: "redirect" as const, url: descriptor.url }
+      ? { kind: "redirect" as const, url: descriptor.url, attemptId, newTab: Boolean(descriptor.newTab) }
       : { kind: "credentials" as const, attemptId, fields: descriptor.fields };
+  });
+}
+
+/** After connecting in a new tab: ask the provider what's now connected. */
+export async function finishConnection(attemptId: string) {
+  return runAction("social.finish", async (user) => {
+    const accounts = await social.completeConnection(user.id, idSchema.parse(attemptId), null);
+    revalidatePath("/onboarding");
+    revalidatePath("/app", "layout");
+    return { connected: accounts.length };
   });
 }
 

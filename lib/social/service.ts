@@ -2,7 +2,8 @@ import "server-only";
 
 /**
  * Postory's social service. The only place application code goes to connect
- * accounts, publish or schedule. Provider specifics stay in ./letmepost.ts.
+ * accounts, publish or schedule. Provider specifics stay in ./publora.ts and
+ * ./letmepost.ts, behind ./provider.ts.
  *
  * Invariants
  *   - A social_accounts row exists only for an account the provider reports as
@@ -13,7 +14,7 @@ import "server-only";
  *     provider Idempotency-Key, so the same post can't go out twice.
  */
 
-import { env, integrations } from "@/lib/env";
+import { env } from "@/lib/env";
 import { describeSocialError, UserFacingError } from "@/lib/errors";
 import { notifyUser } from "@/lib/email/notify";
 import { log } from "@/lib/log";
@@ -23,7 +24,8 @@ import { PLANS, X_CREDITS_PER_POST } from "@/lib/billing/plans";
 import { MEDIA_BUCKET, parseMedia, type PostMedia } from "@/lib/posts/media";
 import { assertTransition, isPostStatus, type PostStatus } from "@/lib/posts/state-machine";
 import { PLATFORM_META, validatePostContent, type Platform } from "./platforms";
-import * as letmepost from "./letmepost";
+import { activeProvider, type ProviderName, type SocialProviderApi } from "./provider";
+import { createManagedUser } from "./publora";
 import { SocialProviderError, type ProviderAccount, type ProviderPostStatus } from "./types";
 import type { Tables } from "@/types/database";
 
@@ -37,18 +39,30 @@ const CONNECT_ATTEMPT_TTL_MS = 30 * 60 * 1000;
 // ---------------------------------------------------------------------------
 
 export type SocialReadiness =
-  | { ready: true; workspaceId: string }
+  | { ready: true; workspaceId: string; provider: SocialProviderApi }
   | { ready: false; reason: "provider_not_configured" | "workspace_not_linked"; message: string };
 
+const NOT_CONFIGURED = "Social publishing isn't configured on this Postory deployment yet.";
+
 export async function getSocialReadiness(userId: string): Promise<SocialReadiness> {
-  if (!integrations.letmepost()) {
-    return {
-      ready: false,
-      reason: "provider_not_configured",
-      message: "Social publishing isn't configured on this Postory deployment yet (LETMEPOST_API_KEY is missing).",
-    };
+  const provider = activeProvider();
+  if (!provider) return { ready: false, reason: "provider_not_configured", message: NOT_CONFIGURED };
+  let workspace = await getWorkspaceId(userId, provider.name);
+  if (!workspace && provider.name === "publora") {
+    try {
+      workspace = await provisionPubloraWorkspace(userId);
+    } catch (error) {
+      const notEnabled = error instanceof SocialProviderError && error.code === "workspace_not_enabled";
+      if (!notEnabled) log.warn("publora workspace provisioning failed", { operation: "social.provision", userId, provider: "publora" }, error);
+      return {
+        ready: false,
+        reason: "workspace_not_linked",
+        message: notEnabled
+          ? "Connecting accounts is being switched on with our publishing partner. Check back shortly — your drafts are safe."
+          : "Postory couldn't set up your publishing workspace just now. Try again in a minute.",
+      };
+    }
   }
-  const workspace = await getWorkspaceId(userId);
   if (!workspace) {
     return {
       ready: false,
@@ -57,24 +71,46 @@ export async function getSocialReadiness(userId: string): Promise<SocialReadines
         "Your Postory workspace hasn't been linked to a publishing workspace yet. We provision these by hand while publishing is in early access — we'll email you when yours is ready.",
     };
   }
-  return { ready: true, workspaceId: workspace };
+  return { ready: true, workspaceId: workspace, provider };
 }
 
-async function getWorkspaceId(userId: string): Promise<string | null> {
+async function getWorkspaceId(userId: string, provider: ProviderName): Promise<string | null> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("social_workspaces")
     .select("external_profile_id")
     .eq("user_id", userId)
-    .eq("provider", "letmepost")
+    .eq("provider", provider)
     .maybeSingle();
   return data?.external_profile_id ?? null;
+}
+
+/**
+ * Each Postory user gets their own Publora managed user, so their
+ * connections and posts are isolated from everyone else's. The username is
+ * a Postory-owned address, so customers' emails aren't shared with Publora.
+ */
+async function provisionPubloraWorkspace(userId: string) {
+  const admin = createAdminClient();
+  const { data: profile } = await admin.from("profiles").select("name,business_name").eq("id", userId).maybeSingle();
+  const managedId = await createManagedUser({
+    username: `u-${userId}@users.postory.lol`,
+    displayName: (profile?.business_name || profile?.name || "Postory customer").slice(0, 80),
+  });
+  const { error } = await admin.from("social_workspaces").insert({ user_id: userId, provider: "publora", external_profile_id: managedId });
+  if (error) {
+    // Lost a race with a concurrent request: use whichever row was stored.
+    const existing = await getWorkspaceId(userId, "publora");
+    if (existing) return existing;
+    throw error;
+  }
+  return managedId;
 }
 
 async function requireWorkspace(userId: string) {
   const readiness = await getSocialReadiness(userId);
   if (!readiness.ready) throw new UserFacingError(readiness.reason, readiness.message);
-  return readiness.workspaceId;
+  return { workspaceId: readiness.workspaceId, p: readiness.provider };
 }
 
 function toUserError(error: unknown, platform: string | undefined, operation: "connect" | "publish" | "schedule" | "sync") {
@@ -107,12 +143,12 @@ export async function listConnectedAccounts(userId: string) {
 }
 
 /**
- * Begin connecting a network. Records an attempt, then asks LetMePost for the
+ * Begin connecting a network. Records an attempt, then asks the provider for the
  * network's consent URL. The account is only stored once the provider reports
  * it in completeConnection().
  */
 export async function startConnection(userId: string, platform: Platform, returnPath: string) {
-  const workspaceId = await requireWorkspace(userId);
+  const { workspaceId, p } = await requireWorkspace(userId);
 
   const [entitlements, existing] = await Promise.all([getEntitlements(userId), listConnectedAccounts(userId)]);
   const connectedCount = existing.filter((a) => a.status !== "disconnected").length;
@@ -131,7 +167,7 @@ export async function startConnection(userId: string, platform: Platform, return
   const admin = createAdminClient();
   let before: ProviderAccount[] = [];
   try {
-    before = await letmepost.listAccounts(workspaceId);
+    before = await p.listAccounts(workspaceId);
   } catch (error) {
     throw toUserError(error, platform, "connect") ?? error;
   }
@@ -146,7 +182,7 @@ export async function startConnection(userId: string, platform: Platform, return
   const returnTo = `${env.appUrl()}/api/social/callback?attempt=${attempt.id}&next=${encodeURIComponent(returnPath)}`;
 
   try {
-    const descriptor = await letmepost.startConnect(platform, { profileId: workspaceId, returnTo });
+    const descriptor = await p.startConnect(platform, { profileId: workspaceId, returnTo });
     if (descriptor.availability === "pending") {
       throw new SocialProviderError("platform_not_enabled", "Not enabled yet.");
     }
@@ -162,7 +198,7 @@ export async function startConnection(userId: string, platform: Platform, return
         completed_at: new Date().toISOString(),
       })
       .eq("id", attempt.id);
-    log.warn("connect start failed", { operation: "social.startConnection", userId, provider: "letmepost", platform }, error);
+    log.warn("connect start failed", { operation: "social.startConnection", userId, provider: p.name, platform }, error);
     throw userError ?? error;
   }
 }
@@ -170,20 +206,20 @@ export async function startConnection(userId: string, platform: Platform, return
 /** Bluesky-style credential connections. */
 export async function completeCredentialsConnection(userId: string, attemptId: string, fields: Record<string, string>) {
   const attempt = await loadPendingAttempt(userId, attemptId);
-  const workspaceId = await requireWorkspace(userId);
+  const { workspaceId, p } = await requireWorkspace(userId);
   try {
-    await letmepost.completeCredentialsConnect(attempt.platform as Platform, { profileId: workspaceId, fields });
+    await p.completeCredentialsConnect(attempt.platform as Platform, { profileId: workspaceId, fields });
   } catch (error) {
     const userError = toUserError(error, attempt.platform, "connect");
     await markAttempt(attemptId, "failed", userError?.code, userError?.message);
     throw userError ?? error;
   }
-  return reconcileAttempt(userId, attempt, workspaceId);
+  return reconcileAttempt(userId, attempt, workspaceId, p);
 }
 
 /**
- * Called when the browser returns from LetMePost. Trusts nothing in the URL
- * except the attempt id: success is determined by asking LetMePost which
+ * Called when the browser returns from the provider. Trusts nothing in the URL
+ * except the attempt id: success is determined by asking the provider which
  * accounts now exist in this user's workspace.
  */
 export async function completeConnection(userId: string, attemptId: string, providerError: string | null) {
@@ -196,8 +232,8 @@ export async function completeConnection(userId: string, attemptId: string, prov
     await markAttempt(attemptId, "failed", providerError, message);
     throw new UserFacingError("connect_failed", message);
   }
-  const workspaceId = await requireWorkspace(userId);
-  return reconcileAttempt(userId, attempt, workspaceId);
+  const { workspaceId, p } = await requireWorkspace(userId);
+  return reconcileAttempt(userId, attempt, workspaceId, p);
 }
 
 async function loadPendingAttempt(userId: string, attemptId: string) {
@@ -225,11 +261,11 @@ async function markAttempt(attemptId: string, status: "completed" | "failed" | "
     .eq("id", attemptId);
 }
 
-async function reconcileAttempt(userId: string, attempt: Tables<"social_connection_attempts">, workspaceId: string) {
+async function reconcileAttempt(userId: string, attempt: Tables<"social_connection_attempts">, workspaceId: string, p: SocialProviderApi) {
   const platform = attempt.platform as Platform;
   let accounts: ProviderAccount[];
   try {
-    accounts = await letmepost.listAccounts(workspaceId);
+    accounts = await p.listAccounts(workspaceId);
   } catch (error) {
     const userError = toUserError(error, platform, "connect");
     await markAttempt(attempt.id, "failed", userError?.code, userError?.message);
@@ -247,12 +283,13 @@ async function reconcileAttempt(userId: string, attempt: Tables<"social_connecti
     throw new UserFacingError("no_account", `No ${PLATFORM_META[platform].name} account was connected. Try again.`);
   }
 
-  const saved = await upsertAccounts(userId, touched);
+  // Publora connects from one page, so other networks may have been added too.
+  const saved = await upsertAccounts(userId, p.name === "publora" ? accounts.filter((a) => a.externalProfileId === workspaceId) : touched, p.name);
   await markAttempt(attempt.id, "completed");
   return saved;
 }
 
-async function upsertAccounts(userId: string, accounts: ProviderAccount[]) {
+async function upsertAccounts(userId: string, accounts: ProviderAccount[], provider: ProviderName) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
   const saved: SocialAccount[] = [];
@@ -260,7 +297,7 @@ async function upsertAccounts(userId: string, accounts: ProviderAccount[]) {
     const { data: existing } = await admin
       .from("social_accounts")
       .select("id,user_id")
-      .eq("provider", "letmepost")
+      .eq("provider", provider)
       .eq("external_account_id", account.externalId)
       .maybeSingle();
 
@@ -269,16 +306,16 @@ async function upsertAccounts(userId: string, accounts: ProviderAccount[]) {
       log.error("provider account already owned by another user", {
         operation: "social.upsertAccounts",
         userId,
-        provider: "letmepost",
+        provider,
         resourceId: account.externalId,
       });
       throw new UserFacingError("account_conflict", "That account is already connected to a different Postory workspace.");
     }
 
-    const expired = account.tokenExpiresAt ? new Date(account.tokenExpiresAt) < new Date() : false;
+    const expired = account.needsReconnect || (account.tokenExpiresAt ? new Date(account.tokenExpiresAt) < new Date() : false);
     const row = {
       user_id: userId,
-      provider: "letmepost",
+      provider,
       platform: account.platform,
       display_name: account.displayName,
       username: account.displayName,
@@ -303,10 +340,10 @@ async function upsertAccounts(userId: string, accounts: ProviderAccount[]) {
  * longer reports are flagged, never silently deleted.
  */
 export async function syncAccounts(userId: string) {
-  const workspaceId = await requireWorkspace(userId);
+  const { workspaceId, p } = await requireWorkspace(userId);
   let accounts: ProviderAccount[];
   try {
-    accounts = (await letmepost.listAccounts(workspaceId)).filter((a) => a.externalProfileId === workspaceId);
+    accounts = (await p.listAccounts(workspaceId)).filter((a) => a.externalProfileId === workspaceId);
   } catch (error) {
     throw toUserError(error, undefined, "sync") ?? error;
   }
@@ -322,7 +359,7 @@ export async function syncAccounts(userId: string) {
 
   // Don't resurrect accounts the user explicitly disconnected in Postory.
   const toSave = accounts.filter((a) => !disconnectedLocally.has(a.externalId));
-  if (toSave.length) await upsertAccounts(userId, toSave);
+  if (toSave.length) await upsertAccounts(userId, toSave, p.name);
 
   const missing = local.filter((a) => !remoteIds.has(a.external_account_id));
   if (missing.length) {
@@ -357,15 +394,16 @@ export async function disconnectAccount(userId: string, socialAccountId: string)
   if (!account) throw new UserFacingError("not_found", "That account isn't connected to your workspace.");
 
   let providerRevoked = false;
-  if (integrations.letmepost()) {
+  const provider = activeProvider();
+  if (provider && provider.name === account.provider) {
     try {
-      await letmepost.disconnectAccount(account.external_account_id);
+      await provider.disconnectAccount(account.external_account_id);
       providerRevoked = true;
     } catch (error) {
       log.warn("provider disconnect not completed", {
         operation: "social.disconnect",
         userId,
-        provider: "letmepost",
+        provider: provider.name,
         resourceId: account.external_account_id,
       }, error);
     }
@@ -426,20 +464,32 @@ function assertContentValid(post: StoryPost, media: PostMedia[]) {
   if (issues.length) throw new UserFacingError("invalid_content", issues.map((i) => i.message).join(" "));
 }
 
-/** Upload stored media to the provider once; cache the provider media id on the post. */
-async function prepareMedia(userId: string, post: StoryPost, media: PostMedia[], workspaceId: string) {
-  if (media.length === 0) return [];
-  const admin = createAdminClient();
-  const prepared: PostMedia[] = [];
+/**
+ * Get stored media to the provider. Upload-style providers get the bytes once
+ * (the provider media id is cached on the post); URL-style providers get
+ * short-lived signed links and fetch the files themselves.
+ */
+async function prepareMedia(userId: string, post: StoryPost, media: PostMedia[], workspaceId: string, p: SocialProviderApi) {
+  if (media.length === 0) return { prepared: [] as PostMedia[], urls: [] as string[] };
   for (const item of media) {
     if (!item.storagePath.startsWith(`${userId}/`)) throw new UserFacingError("invalid_media", "A media file on this post isn't yours.");
+  }
+  const admin = createAdminClient();
+  if (p.media === "urls") {
+    const { data, error } = await admin.storage.from(MEDIA_BUCKET).createSignedUrls(media.map((m) => m.storagePath), 60 * 60);
+    const urls = (data ?? []).map((d) => d.signedUrl).filter((u): u is string => Boolean(u));
+    if (error || urls.length !== media.length) throw new UserFacingError("media_missing", "A media file on this post couldn't be found. Remove it and try again.");
+    return { prepared: media, urls };
+  }
+  const prepared: PostMedia[] = [];
+  for (const item of media) {
     if (item.providerMediaId) {
       prepared.push(item);
       continue;
     }
     const { data: file, error } = await admin.storage.from(MEDIA_BUCKET).download(item.storagePath);
     if (error || !file) throw new UserFacingError("media_missing", "A media file on this post couldn't be found. Remove it and try again.");
-    const uploaded = await letmepost.uploadMedia({
+    const uploaded = await p.uploadMedia({
       bytes: await file.arrayBuffer(),
       filename: item.storagePath.split("/").pop() ?? "media",
       contentType: item.contentType,
@@ -448,7 +498,7 @@ async function prepareMedia(userId: string, post: StoryPost, media: PostMedia[],
     prepared.push({ ...item, providerMediaId: uploaded.mediaId });
   }
   await admin.from("story_posts").update({ media: prepared }).eq("id", post.id).eq("user_id", userId);
-  return prepared;
+  return { prepared, urls: [] as string[] };
 }
 
 function providerStatusToPostStatus(status: ProviderPostStatus): PostStatus {
@@ -473,7 +523,7 @@ function webUrl(uri: string | null) {
 
 /**
  * Publish a post right now. Safe to retry: the status compare-and-set blocks
- * concurrent clicks, and the stored Idempotency-Key makes LetMePost replay its
+ * concurrent clicks, and the stored Idempotency-Key makes the provider replay its
  * original answer instead of posting again.
  */
 export async function publishNow(userId: string, postId: string) {
@@ -486,7 +536,7 @@ export async function publishNow(userId: string, postId: string) {
   }
   assertTransition(post.status, "publishing");
 
-  const workspaceId = await requireWorkspace(userId);
+  const { workspaceId, p } = await requireWorkspace(userId);
   const entitlements = await getEntitlements(userId);
   assertActivePlan(entitlements);
   const account = await loadPublishTarget(userId, post);
@@ -510,15 +560,27 @@ export async function publishNow(userId: string, postId: string) {
   }) : null;
 
   try {
-    const prepared = await prepareMedia(userId, post, media, workspaceId);
-    const result = await letmepost.createPost({
+    const { prepared, urls } = await prepareMedia(userId, post, media, workspaceId, p);
+    const result = await p.createPost({
       accountExternalId: account.external_account_id,
       platform: post.platform as Platform,
       text: post.content,
-      media: prepared.map((m) => ({ kind: m.kind, mediaId: m.providerMediaId!, altText: m.altText })),
+      media: p.media === "upload" ? prepared.map((m) => ({ kind: m.kind, mediaId: m.providerMediaId!, altText: m.altText })) : [],
+      mediaUrls: urls,
       externalProfileId: workspaceId,
       idempotencyKey: post.idempotency_key,
     });
+
+    // Accepted and still going out: the reconciler records the final outcome.
+    if (result.status === "publishing" || result.status === "queued" || result.status === "validated") {
+      const { data } = await admin
+        .from("story_posts")
+        .update({ status: "publishing", scheduled_for: new Date().toISOString(), external_post_id: result.externalPostId, provider_batch_id: result.batchId })
+        .eq("id", post.id)
+        .select("*")
+        .single();
+      return data!;
+    }
 
     if (result.status === "published") {
       const { data } = await admin
@@ -571,7 +633,7 @@ export async function publishNow(userId: string, postId: string) {
         ...(outcomeUnknown ? {} : { idempotency_key: crypto.randomUUID() }),
       })
       .eq("id", post.id);
-    log.error("publish failed", { operation: "social.publishNow", userId, provider: "letmepost", resourceId: post.id, platform: post.platform }, error);
+    log.error("publish failed", { operation: "social.publishNow", userId, provider: p.name, resourceId: post.id, platform: post.platform }, error);
     throw userError ?? new UserFacingError("publish_failed", "Publishing failed. Try again.");
   }
 }
@@ -579,9 +641,9 @@ export async function publishNow(userId: string, postId: string) {
 const MIN_SCHEDULE_LEAD_MS = 2 * 60 * 1000;
 
 /**
- * Queue a post at the provider for a future time. LetMePost executes
- * scheduled posts itself; it currently accepts text-only scheduled posts, so
- * posts with media must be published now instead.
+ * Queue a post at the provider for a future time. The provider executes
+ * scheduled posts itself. Some providers (LetMePost) only take text-only
+ * scheduled posts; with those, posts with media must be published now.
  */
 export async function schedulePost(userId: string, postId: string, when: Date) {
   if (when.getTime() < Date.now() + MIN_SCHEDULE_LEAD_MS) {
@@ -595,14 +657,14 @@ export async function schedulePost(userId: string, postId: string, when: Date) {
   assertTransition(post.status, "scheduled");
 
   const media = parseMedia(post.media);
-  if (media.length > 0) {
+  const { workspaceId, p } = await requireWorkspace(userId);
+  if (media.length > 0 && !p.schedulesMedia) {
     throw new UserFacingError(
       "media_schedule_unsupported",
       "Posts with images or video can't be scheduled through the publishing provider yet. Publish it now, or remove the media to schedule it.",
     );
   }
 
-  const workspaceId = await requireWorkspace(userId);
   const entitlements = await getEntitlements(userId);
   assertActivePlan(entitlements);
   const account = await loadPublishTarget(userId, post);
@@ -625,11 +687,13 @@ export async function schedulePost(userId: string, postId: string, when: Date) {
   }) : null;
 
   try {
-    const result = await letmepost.createPost({
+    const { urls } = await prepareMedia(userId, post, media, workspaceId, p);
+    const result = await p.createPost({
       accountExternalId: account.external_account_id,
       platform: post.platform as Platform,
       text: post.content,
       media: [],
+      mediaUrls: urls,
       scheduledAt: when,
       externalProfileId: workspaceId,
       idempotencyKey: post.idempotency_key,
@@ -664,7 +728,7 @@ export async function schedulePost(userId: string, postId: string, when: Date) {
         ...(outcomeUnknown ? {} : { idempotency_key: crypto.randomUUID() }),
       })
       .eq("id", post.id);
-    log.warn("schedule failed", { operation: "social.schedulePost", userId, provider: "letmepost", resourceId: post.id }, error);
+    log.warn("schedule failed", { operation: "social.schedulePost", userId, provider: p.name, resourceId: post.id }, error);
     throw userError ?? new UserFacingError("schedule_failed", "Scheduling failed. Try again.");
   }
 }
@@ -677,9 +741,9 @@ export async function reschedulePost(userId: string, postId: string, when: Date)
   if (post.status !== "scheduled" || !post.external_post_id) {
     throw new UserFacingError("invalid_state", "Only scheduled posts can be moved.");
   }
-  await requireWorkspace(userId);
+  const { workspaceId, p } = await requireWorkspace(userId);
   try {
-    await letmepost.reschedulePost(post.external_post_id, when);
+    await p.reschedulePost(post.external_post_id, when, workspaceId);
   } catch (error) {
     if (error instanceof SocialProviderError && error.status === 409) {
       await refreshPostFromProvider(userId, post);
@@ -701,10 +765,10 @@ export async function reschedulePost(userId: string, postId: string, when: Date)
 export async function unschedulePost(userId: string, postId: string) {
   const post = await loadOwnedPost(userId, postId);
   if (post.status !== "scheduled") throw new UserFacingError("invalid_state", "This post isn't scheduled.");
-  await requireWorkspace(userId);
+  const { workspaceId, p } = await requireWorkspace(userId);
   if (post.external_post_id) {
     try {
-      await letmepost.cancelPost(post.external_post_id);
+      await p.cancelPost(post.external_post_id, workspaceId);
     } catch (error) {
       if (error instanceof SocialProviderError && error.status === 409) {
         await refreshPostFromProvider(userId, post);
@@ -732,7 +796,10 @@ export async function unschedulePost(userId: string, postId: string) {
 
 async function refreshPostFromProvider(userId: string, post: StoryPost) {
   if (!post.external_post_id) return post;
-  const remote = await letmepost.getPost(post.external_post_id);
+  const p = activeProvider();
+  const workspaceId = p ? await getWorkspaceId(userId, p.name) : null;
+  if (!p || !workspaceId) return post;
+  const remote = await p.getPost(post.external_post_id, workspaceId);
   const next = providerStatusToPostStatus(remote.status);
   const admin = createAdminClient();
   const update: Partial<StoryPost> = { status: next };
@@ -775,12 +842,13 @@ async function refreshPostFromProvider(userId: string, post: StoryPost) {
 }
 
 /**
- * Scheduled posts are executed by LetMePost. When the user looks at their
+ * Scheduled posts are executed by the provider. When the user looks at their
  * content we reconcile anything whose time has passed, so the calendar and
  * library show what really happened. Bounded to keep page loads fast.
  */
 export async function reconcileDuePosts(userId: string, limit = 15) {
-  if (!integrations.letmepost()) return 0;
+  const provider = activeProvider();
+  if (!provider) return 0;
   const admin = createAdminClient();
   const { data: due } = await admin
     .from("story_posts")
@@ -797,7 +865,7 @@ export async function reconcileDuePosts(userId: string, limit = 15) {
       const updated = await refreshPostFromProvider(userId, post);
       if (updated.status !== post.status) changed += 1;
     } catch (error) {
-      log.warn("reconcile failed", { operation: "social.reconcileDuePosts", userId, provider: "letmepost", resourceId: post.id }, error);
+      log.warn("reconcile failed", { operation: "social.reconcileDuePosts", userId, provider: provider.name, resourceId: post.id }, error);
     }
   }
   return changed;

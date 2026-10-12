@@ -491,7 +491,7 @@ function StatusActions({
               description={`This posts immediately${post.account ? ` to ${post.account.name}` : ""}. Postory can't unpublish it afterwards.`}
               confirmLabel={post.status === "failed" ? "Retry publish" : "Publish now"}
               onConfirm={async () => {
-                await onRun("publish", () => publishPostNow(post.id), `Published to ${meta.name}.`);
+                await onRun("publish", () => publishPostNow(post.id), `Sent to ${meta.name}.`);
               }}
             >
               {post.status === "failed" ? "Retry" : "Publish now"}

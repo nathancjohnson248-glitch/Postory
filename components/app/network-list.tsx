@@ -11,7 +11,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { connectNetwork, disconnectNetwork, submitNetworkCredentials, syncNetworks } from "@/app/_actions/social";
+import { connectNetwork, disconnectNetwork, finishConnection, submitNetworkCredentials, syncNetworks } from "@/app/_actions/social";
 import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
@@ -36,24 +36,52 @@ export function NetworkList({
   const [connecting, setConnecting] = useState<Platform | null>(null);
   const [rowErrors, setRowErrors] = useState<Partial<Record<Platform, string>>>({});
   const [credentials, setCredentials] = useState<CredentialsPrompt | null>(null);
+  const [pendingTab, setPendingTab] = useState<{ platform: Platform; attemptId: string } | null>(null);
+  const [finishing, startFinish] = useTransition();
   const [syncing, startSync] = useTransition();
 
   async function connect(platform: Platform) {
     setConnecting(platform);
     setRowErrors((e) => ({ ...e, [platform]: undefined }));
+    // Open the tab during the click so pop-up blockers allow it; point it at the link once it's ready.
+    const tab = window.open("about:blank", "_blank");
     const result = await connectNetwork(platform, returnPath);
     if (!result.ok) {
+      tab?.close();
       setConnecting(null);
       setRowErrors((e) => ({ ...e, [platform]: result.error.message }));
       return;
     }
     if (result.data.kind === "redirect") {
+      if (result.data.newTab && tab) {
+        tab.opener = null;
+        tab.location.href = result.data.url;
+        setConnecting(null);
+        setPendingTab({ platform, attemptId: result.data.attemptId });
+        return;
+      }
+      tab?.close();
       // Keep "Connecting…" visible while the browser leaves for the network.
       window.location.assign(result.data.url);
       return;
     }
+    tab?.close();
     setConnecting(null);
     setCredentials({ platform, attemptId: result.data.attemptId, fields: result.data.fields });
+  }
+
+  function finish() {
+    if (!pendingTab) return;
+    startFinish(async () => {
+      const result = await finishConnection(pendingTab.attemptId);
+      if (!result.ok) {
+        toast.error(result.error.message);
+        return;
+      }
+      setPendingTab(null);
+      toast.success(result.data.connected === 1 ? "Account connected." : `${result.data.connected} accounts connected.`);
+      router.refresh();
+    });
   }
 
   async function disconnect(accountId: string, platform: Platform) {
@@ -65,13 +93,36 @@ export function NetworkList({
     toast.success(
       result.data.providerRevoked
         ? `${PLATFORM_META[platform].name} disconnected.`
-        : `${PLATFORM_META[platform].name} disconnected from Postory. To fully revoke access, remove it in the publishing provider's dashboard too.`,
+        : `${PLATFORM_META[platform].name} disconnected from Postory — it won't be used for posting. To revoke access entirely, remove it on the network's connected-apps page too.`,
     );
     router.refresh();
   }
 
   return (
     <div className="flex flex-col gap-4">
+      <AnimatePresence>
+        {pendingTab ? (
+          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}>
+            <Notice
+              tone="info"
+              title={`Finish connecting ${PLATFORM_META[pendingTab.platform].name} in the new tab`}
+              action={
+                <div className="flex gap-2">
+                  <Button size="sm" variant="accent" loading={finishing} onClick={finish}>
+                    I&apos;ve connected it
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPendingTab(null)} disabled={finishing}>
+                    Cancel
+                  </Button>
+                </div>
+              }
+            >
+              Sign in and approve access there, then come back here. You can connect several networks in that tab at once.
+            </Notice>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
       {!readiness.ready && readiness.message ? (
         <Notice tone="info" title="Connecting networks isn't available yet">
           {readiness.message}

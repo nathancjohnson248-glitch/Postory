@@ -9,11 +9,13 @@ export type ProviderAccount = {
   externalProfileId: string | null;
   platformAccountId: string;
   tokenExpiresAt: string | null;
+  /** The provider says this connection can't publish until it's reconnected. */
+  needsReconnect?: boolean;
   metadata: Record<string, unknown>;
 };
 
 export type ConnectDescriptor =
-  | { kind: "redirect"; url: string; availability: "stable" | "trial" | "pending" }
+  | { kind: "redirect"; url: string; availability: "stable" | "trial" | "pending"; newTab?: boolean }
   | { kind: "credentials"; fields: { name: string; label: string; type: string }[]; availability: "stable" | "trial" | "pending" };
 
 export type ProviderMedia = { kind: "image" | "video"; mediaId: string; altText?: string };
@@ -26,6 +28,8 @@ export type PublishRequest = {
   scheduledAt?: Date;
   externalProfileId?: string | null;
   idempotencyKey: string;
+  /** Short-lived public URLs, for providers that fetch media themselves. */
+  mediaUrls?: string[];
 };
 
 export type ProviderPostStatus = "queued" | "validated" | "publishing" | "published" | "failed" | "rejected" | "canceled";

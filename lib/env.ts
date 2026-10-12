@@ -33,6 +33,7 @@ export const env = {
   supabaseSecretKey: () => read("SUPABASE_SECRET_KEY"),
 
   letmepostApiKey: () => read("LETMEPOST_API_KEY"),
+  publoraApiKey: () => read("PUBLORA_API_KEY"),
   letmepostBaseUrl: () => (read("LETMEPOST_API_BASE_URL") ?? "https://api.letmepost.dev").replace(/\/+$/, ""),
 
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
@@ -70,6 +71,7 @@ export const integrations = {
   supabase: () => Boolean(env.supabaseUrl() && env.supabasePublishableKey()),
   supabaseAdmin: () => Boolean(env.supabaseUrl() && env.supabaseSecretKey()),
   letmepost: () => Boolean(env.letmepostApiKey()),
+  publora: () => Boolean(env.publoraApiKey()),
   handypay: () => Boolean(env.handypayApiKey()),
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
@@ -86,6 +88,7 @@ export function integrationStatus(): IntegrationStatus {
     supabase: integrations.supabase(),
     supabaseAdmin: integrations.supabaseAdmin(),
     letmepost: integrations.letmepost(),
+    publora: integrations.publora(),
     handypay: integrations.handypay(),
     openai: integrations.openai(),
     resend: integrations.resend(),
