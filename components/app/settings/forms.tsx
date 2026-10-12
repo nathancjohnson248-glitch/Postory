@@ -14,6 +14,7 @@ import {
   deleteAccount,
   updateAiPreferences,
   updateBusinessSettings,
+  updateNotificationSettings,
   updateProfileSettings,
   updateVoiceSettings,
 } from "@/app/_actions/settings";
@@ -54,6 +55,38 @@ export function SettingsCard({ id, title, description, children }: { id: string;
       </div>
       <div className="px-6 py-6">{children}</div>
     </section>
+  );
+}
+
+/** The one email a user can turn off: product updates. Everything else is sent only when something needs them. */
+export function ProductUpdatesToggle({ enabled }: { enabled: boolean }) {
+  const { pending, save } = useSave();
+  const [on, setOn] = useState(enabled);
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-4">
+      <span>
+        <span className="block text-[14px] font-medium">Product updates</span>
+        <span className="block text-[13px] text-muted">An occasional email when something new ships in Postory. A few a month at most.</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-label="Product update emails"
+        disabled={pending}
+        onClick={() => {
+          const next = !on;
+          setOn(next);
+          save(() => updateNotificationSettings({ productUpdates: next }), next ? "Product updates on." : "Product updates off.");
+        }}
+        className={cn(
+          "relative mt-0.5 inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-60",
+          on ? "bg-blue-600" : "bg-line-strong",
+        )}
+      >
+        <span className={cn("inline-block size-5 rounded-full bg-white shadow-sm transition-transform", on ? "translate-x-[18px]" : "translate-x-0.5")} />
+      </button>
+    </label>
   );
 }
 

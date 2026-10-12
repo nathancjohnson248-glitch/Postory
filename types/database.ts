@@ -261,6 +261,7 @@ export type Database = {
           onboarding_completed: boolean
           onboarding_completed_at: string | null
           onboarding_step: string
+          product_updates: boolean
           timezone: string
           updated_at: string
           website_url: string | null
@@ -278,6 +279,7 @@ export type Database = {
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
           onboarding_step?: string
+          product_updates?: boolean
           timezone?: string
           updated_at?: string
           website_url?: string | null
@@ -295,6 +297,7 @@ export type Database = {
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
           onboarding_step?: string
+          product_updates?: boolean
           timezone?: string
           updated_at?: string
           website_url?: string | null

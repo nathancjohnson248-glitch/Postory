@@ -34,7 +34,8 @@ ${body}
 </td></tr>
 <tr><td style="padding:20px 36px 26px 36px;border-top:1px solid ${LINE};font-family:${FONT};font-size:12.5px;line-height:1.6;color:${MUTED};">
 Postory · AI social media for founders who ship.<br>
-<a href="${ASSETS}" style="color:${MUTED};text-decoration:underline;">${site.domain}</a>${footerNote ? `<br><span style="color:#9c9ca4;">${escape(footerNote)}</span>` : ""}
+<a href="${ASSETS}" style="color:${MUTED};text-decoration:underline;">${site.domain}</a>${footerNote ? `<br><span style="color:#9c9ca4;">${escape(footerNote)}</span>` : ""}<br>
+<span style="color:#9c9ca4;">This address only sends — replies aren't read. To reach a person, write to <a href="mailto:${site.founder.email}" style="color:#9c9ca4;text-decoration:underline;">${escape(site.founder.email)}</a> or <a href="${site.founder.xUrl}" style="color:#9c9ca4;text-decoration:underline;">${escape(site.founder.xHandle)}</a> on X.</span>
 </td></tr>
 </table>
 </td></tr>
@@ -145,7 +146,7 @@ export const templates = {
         "",
         `Open Postory: ${site.url}/app`,
         "",
-        `One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? Just reply to this email (or write to ${mail}) — I read every message myself.`,
+        `One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? This address only sends, so write to me at ${mail} or message me on X — I read every message myself.`,
         "",
         "Talk soon,",
         `${site.founder.name}`,
@@ -164,7 +165,7 @@ export const templates = {
           p("I'm Nathan, and I built Postory for a simple reason: the businesses doing the most interesting work are often the ones posting the least. There's always something more urgent than rewriting the same update for five different apps.") +
           p("So Postory works the other way round. You tell it what happened — a launch, a new hire, a milestone, something you learned — and it shapes that one story into a post for each network you use. Nothing goes out until you've read it and said yes.") +
           button("Open Postory", `${site.url}/app`) +
-          `<p style="margin:22px 0 0 0;">One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? <strong style="color:${INK};font-weight:600;">Just reply to this email</strong> (or write to <a href="mailto:${mail}" style="color:${BLUE};text-decoration:none;font-weight:600;">${escape(mail)}</a>) — I read every message myself.</p>` +
+          `<p style="margin:22px 0 0 0;">One thing I'd genuinely love to know: what made you try Postory, and what would make it worth keeping? This address only sends, so <strong style="color:${INK};font-weight:600;">write to me at <a href="mailto:${mail}" style="color:${BLUE};text-decoration:none;font-weight:600;">${escape(mail)}</a></strong> or message me on <a href="${site.founder.xUrl}" style="color:${BLUE};text-decoration:none;font-weight:600;">X</a> — I read every message myself.</p>` +
           `<p style="margin:22px 0 0 0;color:${INK};">Talk soon,</p>` +
           founderSignature() +
           buildingInPublic(),
@@ -193,6 +194,26 @@ export const templates = {
       body: h1(`Your ${input.network} post wasn't published.`) + p(input.reason) + button("Review the post", `${site.url}/app/library/${input.storyId}`),
     }),
   }),
+
+  /** A product update the owner sends to everyone who hasn't opted out. Plain paragraphs, one optional button. */
+  productUpdate: (input: { subject: string; headline: string; body: string; ctaLabel?: string; ctaUrl?: string }) => {
+    const paragraphs = input.body.split(/\n{2,}/).map((para) => para.trim()).filter(Boolean);
+    const cta = input.ctaLabel && input.ctaUrl ? { label: input.ctaLabel, url: input.ctaUrl } : null;
+    return {
+      subject: input.subject,
+      text: [input.headline, "", ...paragraphs.flatMap((para) => [para, ""]), ...(cta ? [`${cta.label}: ${cta.url}`, ""] : []), `${site.founder.name}, Postory`, "", `Turn off product updates: ${site.url}/app/settings#notifications`].join("\n"),
+      html: layout({
+        preheader: paragraphs[0]?.slice(0, 140) ?? input.headline,
+        footerNote: "You're receiving this because you have a Postory account. Turn off product updates in Settings → Notifications.",
+        body:
+          h1(input.headline) +
+          paragraphs.map((para) => `<p style="margin:0 0 16px 0;">${escape(para).replace(/\n/g, "<br>")}</p>`).join("") +
+          (cta ? button(cta.label, cta.url) : "") +
+          `<p style="margin:22px 0 0 0;color:${INK};">— ${escape(site.founder.name)}</p>` +
+          `<p style="margin:18px 0 0 0;font-size:13px;color:${MUTED};"><a href="${site.url}/app/settings#notifications" style="color:${MUTED};text-decoration:underline;">Turn off product updates</a></p>`,
+      }),
+    };
+  },
 
   connectionIssue: (input: { network: string }) => ({
     subject: `Reconnect ${input.network} to keep posting`,

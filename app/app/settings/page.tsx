@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Bot, Check, CreditCard, Mail, Minus, Workflow } from "lucide-react";
 import { PageHeader } from "@/components/app/section";
-import { AiPreferencesForm, BusinessForm, DeleteAccount, MemoryManager, ProfileForm, SettingsCard, VoiceForm } from "@/components/app/settings/forms";
+import { AiPreferencesForm, BusinessForm, DeleteAccount, MemoryManager, ProductUpdatesToggle, ProfileForm, SettingsCard, VoiceForm } from "@/components/app/settings/forms";
 import { ResetPasswordForm } from "@/components/onboarding/auth-forms";
 import { ButtonLink } from "@/components/ui/button";
 import { readPreferences } from "@/lib/ai/context";
@@ -13,6 +13,7 @@ import { getEntitlements } from "@/lib/entitlements";
 import { PLANS } from "@/lib/billing/plans";
 import { createClient } from "@/lib/supabase/server";
 import { isPlatform, type Platform } from "@/lib/social/platforms";
+import { site } from "@/lib/site";
 import { safeTimeZone } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -118,12 +119,16 @@ export default async function SettingsPage() {
               ))}
             </ul>
           </SettingsCard>
-          <SettingsCard id="notifications" title="Notifications" description={`Postory emails ${user.email ?? "you"} only when something needs you.`}>
+          <SettingsCard
+            id="notifications"
+            title="Notifications"
+            description={`Postory emails ${user.email ?? "you"} from a send-only address, so replies aren't read. To reach a person, write to ${site.founder.email}.`}
+          >
             <ul className="flex flex-col gap-3">
               {[
                 ["A post fails to publish", "With the network's reason and a link to fix it."],
                 ["A network needs reconnecting", "Scheduled posts for it are held until you do."],
-                ["Your trial starts", "With the date it ends. No marketing emails."],
+                ["Your account and trial", "Sign-in codes, your welcome note, and the date your trial ends."],
               ].map(([title, body]) => (
                 <li key={title} className="flex items-start gap-3">
                   <Mail className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
@@ -134,6 +139,9 @@ export default async function SettingsPage() {
                 </li>
               ))}
             </ul>
+            <div className="mt-5 border-t border-line pt-5">
+              <ProductUpdatesToggle enabled={profile.product_updates} />
+            </div>
           </SettingsCard>
           <SettingsCard id="automation" title="Automation & agents" description="Optional, advanced, and never on by default.">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

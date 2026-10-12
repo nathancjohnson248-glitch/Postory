@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Mail } from "lucide-react";
+import { Megaphone } from "lucide-react";
 import { PageHeader } from "@/components/app/section";
 import { BarList } from "@/components/app/analytics/bar-list";
 import { ColumnChart } from "@/components/app/analytics/column-chart";
@@ -32,8 +32,8 @@ export default async function AdminPage() {
         title="Business at a glance"
         actions={
           role === "owner" ? (
-            <Link href="/app/admin/mail" className="inline-flex h-10 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-medium shadow-hairline transition-colors hover:bg-wash">
-              <Mail className="size-4" aria-hidden /> Mail
+            <Link href="/app/admin/updates" className="inline-flex h-10 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-medium shadow-hairline transition-colors hover:bg-wash">
+              <Megaphone className="size-4" aria-hidden /> Product updates
             </Link>
           ) : undefined
         }

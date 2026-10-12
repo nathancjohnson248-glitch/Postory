@@ -1,14 +1,12 @@
 import "server-only";
 
 import nodemailer, { type Transporter } from "nodemailer";
-import { Resend } from "resend";
 import { env, integrations } from "@/lib/env";
 import { log } from "@/lib/log";
 import { templates, type EmailTemplate, type TemplateInput } from "./templates";
 import { sendViaZoho } from "./zoho";
 
 let smtp: Transporter | null = null;
-let resend: Resend | null = null;
 
 function smtpTransport() {
   smtp ??= nodemailer.createTransport({
@@ -24,8 +22,9 @@ function smtpTransport() {
 }
 
 /**
- * Send a transactional email from Postory's own address — through Zoho
- * Mail's API, an SMTP mailbox, or Resend, whichever is configured.
+ * Send an email from Postory's own send-only address — through Zoho Mail's
+ * API, or an SMTP mailbox when Zoho isn't configured. Replies aren't read;
+ * every template says where to reach a person instead.
  * Email is never a blocker: when no sender is configured the send is skipped
  * and logged, and callers carry on.
  */
@@ -48,27 +47,12 @@ export async function sendEmail<T extends EmailTemplate>(to: string | null | und
     }
   }
 
-  if (integrations.smtp()) {
-    try {
-      const info = await smtpTransport().sendMail({ from: env.smtpFrom(), to, subject, html, text });
-      log.info("email sent", { operation: "email.send", provider: "smtp", template, response: String(info.response).slice(0, 120) });
-      return { sent: true as const };
-    } catch (error) {
-      log.warn("email failed", { operation: "email.send", provider: "smtp", template }, error);
-      return { sent: false as const, reason: "error" };
-    }
-  }
-
-  resend ??= new Resend(env.resendApiKey());
   try {
-    const { error } = await resend.emails.send({ from: env.resendFromEmail()!, to, subject, html, text });
-    if (error) {
-      log.warn("email rejected", { operation: "email.send", provider: "resend", template }, error);
-      return { sent: false as const, reason: "rejected" };
-    }
+    const info = await smtpTransport().sendMail({ from: env.smtpFrom(), to, subject, html, text });
+    log.info("email sent", { operation: "email.send", provider: "smtp", template, response: String(info.response).slice(0, 120) });
     return { sent: true as const };
   } catch (error) {
-    log.warn("email failed", { operation: "email.send", provider: "resend", template }, error);
+    log.warn("email failed", { operation: "email.send", provider: "smtp", template }, error);
     return { sent: false as const, reason: "error" };
   }
 }

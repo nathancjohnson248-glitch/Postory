@@ -26,7 +26,6 @@
     "openai": "7.32.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "resend": "6.32.1",
     "server-only": "0.0.1",
     "simple-icons": "16.35.0",
     "sonner": "2.0.8",

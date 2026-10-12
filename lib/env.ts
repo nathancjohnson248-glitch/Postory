@@ -72,10 +72,7 @@ export const env = {
   openaiModel: () => read("OPENAI_MODEL") ?? "gpt-5.4-mini",
   openaiImageModel: () => read("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
 
-  resendApiKey: () => read("RESEND_API_KEY"),
-  resendFromEmail: () => read("RESEND_FROM_EMAIL"),
-
-  // Any SMTP mailbox (e.g. Zoho Mail: smtp.zoho.com, 465). Used when Resend isn't set.
+  // Any SMTP mailbox (e.g. Zoho Mail: smtp.zoho.com, 465). Used when the Zoho API isn't set.
   smtpHost: () => read("SMTP_HOST"),
   smtpPort: () => Number(read("SMTP_PORT") ?? 465),
   smtpUser: () => read("SMTP_USER"),
@@ -115,11 +112,10 @@ export const integrations = {
   replicate: () => Boolean(env.replicateApiToken()),
   cloudflareAi: () => Boolean(env.cloudflareAccountId() && env.cloudflareAiToken()),
   openai: () => Boolean(env.openaiApiKey()),
-  resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
   zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
-  /** Postory can send email from its own address (Zoho, SMTP or Resend). */
-  email: () => integrations.zoho() || integrations.smtp() || integrations.resend(),
+  /** Postory can send email from its own address (Zoho or SMTP). */
+  email: () => integrations.zoho() || integrations.smtp(),
 };
 
 export type IntegrationStatus = Record<keyof typeof integrations, boolean>;
@@ -140,7 +136,6 @@ export function integrationStatus(): IntegrationStatus {
     replicate: integrations.replicate(),
     cloudflareAi: integrations.cloudflareAi(),
     openai: integrations.openai(),
-    resend: integrations.resend(),
     smtp: integrations.smtp(),
     zoho: integrations.zoho(),
     email: integrations.email(),

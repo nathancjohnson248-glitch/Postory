@@ -120,3 +120,14 @@ export async function deleteAccount(confirmation: string) {
   if (result.ok) redirect("/?account=deleted");
   return result;
 }
+
+export async function updateNotificationSettings(input: { productUpdates: boolean }) {
+  return runAction("settings.notifications", async (user) => {
+    const productUpdates = z.boolean().parse(input.productUpdates);
+    const supabase = await createClient();
+    const { error } = await supabase.from("profiles").update({ product_updates: productUpdates }).eq("id", user.id);
+    if (error) throw error;
+    revalidatePath("/app/settings");
+    return { saved: true };
+  });
+}
