@@ -56,6 +56,7 @@ export default async function SettingsPage() {
     { label: "Publish to your connected accounts", on: connectedCount > 0, detail: connectedCount ? `${connectedCount} connected. Only after you approve a post, and only when you press Publish or a schedule you set fires.` : "No accounts connected." },
     { label: "Use your business memory when writing", on: true, detail: "Your profile, voice and saved facts — nothing else." },
     { label: "Send your story text to the AI model", on: aiAvailable(), detail: "Only when you generate, edit with AI, or ask the assistant." },
+    { label: "Read engagement on your published posts", on: connectedCount > 0, detail: "Reactions, comments and reposts on LinkedIn and Bluesky posts Postory published — never your feed or DMs." },
     { label: "Read comments or messages from your networks", on: false, detail: "Not available through Postory's publishing provider today." },
     { label: "Run on autopilot or take instructions from AI agents", on: false, detail: "Off. See Automation & agents below." },
     { label: "Delete posts from your networks", on: false, detail: "Postory never deletes anything you've published." },

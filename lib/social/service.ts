@@ -25,7 +25,7 @@ import { MEDIA_BUCKET, parseMedia, type PostMedia } from "@/lib/posts/media";
 import { assertTransition, isPostStatus, type PostStatus } from "@/lib/posts/state-machine";
 import { PLATFORM_META, validatePostContent, type Platform } from "./platforms";
 import { activeProvider, type ProviderName, type SocialProviderApi } from "./provider";
-import { createManagedUser } from "./publora";
+import { blueskyPostMetrics, createManagedUser, linkedinPostMetrics, type PostMetrics } from "./publora";
 import { SocialProviderError, type ProviderAccount, type ProviderPostStatus } from "./types";
 import type { Tables } from "@/types/database";
 
@@ -871,4 +871,52 @@ export async function reconcileDuePosts(userId: string, limit = 15) {
     }
   }
   return changed;
+}
+
+/**
+ * Read engagement back for recently published LinkedIn and Bluesky posts
+ * (the networks Publora shares statistics for). Never throws: analytics are
+ * best-effort and the page renders with whatever is already stored.
+ */
+export async function syncPostMetrics(userId: string) {
+  if (activeProvider()?.name !== "publora") return;
+  try {
+    const workspaceId = await getWorkspaceId(userId, "publora");
+    if (!workspaceId) return;
+    const admin = createAdminClient();
+    const staleBefore = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data: rows } = await admin
+      .from("story_posts")
+      .select("id,platform,platform_post_id,metrics_synced_at,social_accounts(external_account_id)")
+      .eq("user_id", userId)
+      .eq("status", "published")
+      .in("platform", ["linkedin", "bluesky"])
+      .not("platform_post_id", "is", null)
+      .gte("published_at", new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+      .or(`metrics_synced_at.is.null,metrics_synced_at.lt.${staleBefore}`)
+      .limit(25);
+    const posts = ((rows ?? []) as unknown as { id: string; platform: string; platform_post_id: string; social_accounts: { external_account_id: string } | null }[]).filter(
+      (r) => r.social_accounts?.external_account_id,
+    );
+    if (!posts.length) return;
+
+    const now = new Date().toISOString();
+    const save = (id: string, metrics: PostMetrics | null) =>
+      admin.from("story_posts").update({ metrics_synced_at: now, ...(metrics ? { metrics } : {}) }).eq("id", id).eq("user_id", userId);
+
+    const bluesky = posts.filter((p) => p.platform === "bluesky");
+    if (bluesky.length) {
+      const stats = await blueskyPostMetrics(
+        bluesky.map((p) => ({ postedId: p.platform_post_id, platformId: p.social_accounts!.external_account_id })),
+        workspaceId,
+      );
+      await Promise.all(bluesky.map((p) => save(p.id, stats[p.platform_post_id] ?? null)));
+    }
+    for (const p of posts.filter((x) => x.platform === "linkedin")) {
+      const metrics = await linkedinPostMetrics({ postedId: p.platform_post_id, platformId: p.social_accounts!.external_account_id, managedUserId: workspaceId }).catch(() => null);
+      await save(p.id, metrics);
+    }
+  } catch (error) {
+    log.warn("metrics sync failed", { operation: "social.metrics", userId, provider: "publora" }, error);
+  }
 }

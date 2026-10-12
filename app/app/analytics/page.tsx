@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { requireAppAccess } from "@/lib/auth/access";
 import { getAnalytics } from "@/lib/data/analytics";
+import { syncPostMetrics } from "@/lib/social/service";
 import { getEntitlements } from "@/lib/entitlements";
 import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { safeTimeZone } from "@/lib/time";
@@ -22,6 +23,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const { range } = await searchParams;
   const tz = safeTimeZone(profile.timezone);
   const rangeDays = range === "90" ? 90 : 30;
+  // Pull fresh engagement first, but never hold the page for more than a few seconds.
+  await Promise.race([syncPostMetrics(user.id), new Promise((r) => setTimeout(r, 4000))]);
   const [data, entitlements] = await Promise.all([getAnalytics(user.id, tz, rangeDays), getEntitlements(user.id)]);
   const advanced = entitlements.active && entitlements.features.advancedAnalytics;
 
@@ -96,6 +99,25 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
               </div>
             </Section>
           </div>
+
+          {data.topPosts.length ? (
+            <Section title="What people engaged with" description="Reactions, comments and reposts reported by the network. LinkedIn and Bluesky for now.">
+              <ul className="stagger-in flex flex-col px-2 pb-2">
+                {data.topPosts.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/app/library/${p.storyId}`} className="flex items-center gap-3 rounded-2xl px-3 py-3 transition-colors hover:bg-wash">
+                      <PlatformIcon platform={p.platform} tile className="size-7 shrink-0 rounded-[9px]" />
+                      <span className="min-w-0 flex-1 truncate text-[14px] text-ink-soft">{p.content.replace(/\s+/g, " ")}</span>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-[15px] font-semibold tabular-nums">{p.engagement.toLocaleString()}</span>
+                        {p.impressions !== null ? <span className="block text-[11.5px] tabular-nums text-muted">{p.impressions.toLocaleString()} views</span> : null}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Section title="Stories that travelled furthest" description="By number of networks published to.">
@@ -173,10 +195,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         </div>
       )}
 
-      <Notice tone="info" title="Engagement numbers aren't available yet." className="mt-6">
-        Followers, impressions and likes come from each network&apos;s analytics. Postory&apos;s publishing provider doesn&apos;t report them yet, so
-        this page only shows what Postory knows for certain. Nothing here is estimated.
-      </Notice>
+      {data.topPosts.length ? null : (
+        <Notice tone="info" title="Engagement shows up as networks report it." className="mt-6">
+          Reactions, comments and reposts are read back from LinkedIn and Bluesky once your posts there are live; other networks don&apos;t share them with
+          Postory&apos;s publishing provider yet. Nothing here is estimated.
+        </Notice>
+      )}
     </>
   );
 }

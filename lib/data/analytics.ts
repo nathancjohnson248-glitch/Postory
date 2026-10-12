@@ -27,7 +27,7 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
   const [{ data: published }, { data: created }, { count: storiesCount }, { data: snapshots }] = await Promise.all([
     supabase
       .from("story_posts")
-      .select("platform,published_at,story_id,angle,stories(title)")
+      .select("id,platform,published_at,story_id,angle,content,metrics,stories(title)")
       .eq("user_id", userId)
       .eq("status", "published")
       .gte("published_at", since)
@@ -42,7 +42,16 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
       .order("metric_date"),
   ]);
 
-  const all = (published ?? []) as unknown as { platform: string; published_at: string; story_id: string; angle: string | null; stories: { title: string } | null }[];
+  const all = (published ?? []) as unknown as {
+    id: string;
+    platform: string;
+    published_at: string;
+    story_id: string;
+    angle: string | null;
+    content: string;
+    metrics: { impressions?: number | null; reactions?: number | null; comments?: number | null; reposts?: number | null } | null;
+    stories: { title: string } | null;
+  }[];
   const inRange = all.filter((p) => new Date(p.published_at) >= rangeStart);
 
   const weekly = weekKeys.map((key, i) => {
@@ -92,11 +101,36 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
     .sort((a, b) => b.count - a.count)
     .slice(0, 6);
 
+  // Engagement the networks reported back (only where the provider shares it).
+  const engagementOf = (m: (typeof all)[number]["metrics"]) => (m ? (m.reactions ?? 0) + (m.comments ?? 0) + (m.reposts ?? 0) : null);
+  const measured = inRange.filter((p) => p.metrics && engagementOf(p.metrics) !== null);
+  const topPosts = measured
+    .map((p) => ({ id: p.id, storyId: p.story_id, platform: p.platform as Platform, content: p.content, engagement: engagementOf(p.metrics)!, impressions: p.metrics?.impressions ?? null }))
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, 5);
+  const engagementByNetwork = Object.entries(
+    measured.reduce<Record<string, { total: number; posts: number }>>((acc, p) => {
+      const e = acc[p.platform] ?? { total: 0, posts: 0 };
+      e.total += engagementOf(p.metrics)!;
+      e.posts += 1;
+      acc[p.platform] = e;
+      return acc;
+    }, {}),
+  )
+    .map(([platform, v]) => ({ platform: platform as Platform, perPost: v.total / v.posts, total: v.total }))
+    .sort((a, b) => b.perPost - a.perPost);
+
   const headlines: string[] = [];
   if (inRange.length) {
     headlines.push(`You published ${inRange.length} ${inRange.length === 1 ? "post" : "posts"} in the last ${rangeDays} days.`);
     if (byNetwork[0]) headlines.push(`${PLATFORM_META[byNetwork[0].platform].name} was your most active network (${byNetwork[0].count}).`);
     if (storyReach[0] && storyReach[0].networks.size > 1) headlines.push(`“${storyReach[0].title}” reached the most networks (${storyReach[0].networks.size}).`);
+  }
+  if (engagementByNetwork.length > 1 && engagementByNetwork[0].perPost > 0) {
+    const best = engagementByNetwork[0];
+    headlines.push(`${PLATFORM_META[best.platform].name} drew the most engagement per post (${Math.round(best.perPost)} reactions, comments and reposts on average).`);
+  } else if (topPosts[0]?.engagement) {
+    headlines.push(`Your best post drew ${topPosts[0].engagement} reactions, comments and reposts.`);
   }
   if (reviewed >= 5) headlines.push(`You approved ${Math.round((accepted / reviewed) * 100)}% of the posts Postory wrote.`);
 
@@ -112,6 +146,8 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
       byAngle,
     },
     engagement: snapshots ?? [],
+    topPosts,
+    engagementByNetwork,
     headlines,
   };
 }

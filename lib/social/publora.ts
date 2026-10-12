@@ -305,3 +305,40 @@ export async function reschedulePost(postGroupId: string, scheduledAt: Date, man
 export async function cancelPost(postGroupId: string, managedUserId?: string | null): Promise<void> {
   await request(`/delete-post/${encodeURIComponent(postGroupId)}`, { method: "DELETE", userId: managedUserId });
 }
+
+// --- Engagement (docs: LinkedIn Statistics; Mastodon & Bluesky Statistics) ---
+
+/** Postory's normalised engagement numbers. null = the network doesn't share it. */
+export type PostMetrics = { impressions: number | null; reach: number | null; reactions: number | null; comments: number | null; reposts: number | null };
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+
+/** POST /linkedin-post-statistics with queryTypes "ALL". */
+export async function linkedinPostMetrics(input: { postedId: string; platformId: string; managedUserId?: string | null }): Promise<PostMetrics | null> {
+  const res = await request<{ metrics?: Record<string, unknown> }>("/linkedin-post-statistics", {
+    method: "POST",
+    userId: input.managedUserId,
+    json: { postedId: input.postedId, platformId: input.platformId, queryTypes: "ALL" },
+  });
+  const m = res.metrics;
+  if (!m) return null;
+  return { impressions: num(m.IMPRESSION), reach: num(m.MEMBERS_REACHED), reactions: num(m.REACTION), comments: num(m.COMMENT), reposts: num(m.RESHARE) };
+}
+
+/** POST /post-statistics for Bluesky posts, up to 50 at a time. Keyed by postedId. */
+export async function blueskyPostMetrics(
+  posts: { postedId: string; platformId: string }[],
+  managedUserId?: string | null,
+): Promise<Record<string, PostMetrics | null>> {
+  if (!posts.length) return {};
+  const res = await request<{ stats?: Record<string, Record<string, unknown> | null> }>("/post-statistics", {
+    method: "POST",
+    userId: managedUserId,
+    json: { posts: posts.slice(0, 50).map((p) => ({ platform: "bluesky", platformId: p.platformId, postedId: p.postedId })) },
+  });
+  const out: Record<string, PostMetrics | null> = {};
+  for (const [id, s] of Object.entries(res.stats ?? {})) {
+    out[id] = s ? { impressions: num(s.impressions), reach: num(s.reach), reactions: num(s.reactions), comments: num(s.comments), reposts: num(s.reposts) } : null;
+  }
+  return out;
+}
