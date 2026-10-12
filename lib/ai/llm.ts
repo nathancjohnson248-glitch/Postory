@@ -8,8 +8,8 @@ import { log } from "@/lib/log";
 
 /**
  * Postory's one door to a language model. Text goes to OpenRouter first
- * (Claude Sonnet for writing, Haiku for quick checks), then Gemini, Groq and
- * OpenAI — whichever are configured — and a provider that refuses
+ * (Claude Sonnet for writing, Haiku for quick checks), then Replicate (also
+ * Claude), Gemini, Groq and OpenAI — whichever are configured — and a provider that refuses
  * access is skipped for a while so people never wait on a known failure.
  * Images go to Cloudflare Workers AI, then Gemini, then OpenAI; Groq has no
  * image model. Every call asks
@@ -31,7 +31,7 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 
 const GEMINI = "https://generativelanguage.googleapis.com/v1beta/models";
 
-type TextProvider = "openrouter" | "gemini" | "groq" | "openai";
+type TextProvider = "openrouter" | "replicate" | "gemini" | "groq" | "openai";
 
 /** Providers that answered "no access" recently, and until when to skip them. */
 const benched = new Map<TextProvider, number>();
@@ -40,6 +40,7 @@ const BENCH_MS = 10 * 60_000;
 function textProviders(): TextProvider[] {
   const all: TextProvider[] = [];
   if (integrations.openrouter()) all.push("openrouter");
+  if (integrations.replicate()) all.push("replicate");
   if (integrations.gemini()) all.push("gemini");
   if (integrations.groq()) all.push("groq");
   if (integrations.openai()) all.push("openai");
@@ -54,7 +55,7 @@ export function llmProvider(): TextProvider | null {
 }
 
 export function imageAvailable() {
-  return integrations.cloudflareAi() || integrations.openrouter() || integrations.gemini() || integrations.openai();
+  return integrations.replicate() || integrations.cloudflareAi() || integrations.openrouter() || integrations.gemini() || integrations.openai();
 }
 
 /** JSON Schema for Gemini's responseJsonSchema, from the zod model schema. */
@@ -175,6 +176,75 @@ async function viaOpenRouter<S extends z.ZodType>(input: StructuredInput<S>): Pr
   }
 }
 
+// --- Replicate ------------------------------------------------------------------
+
+type Prediction = { status?: string; output?: unknown; error?: unknown; urls?: { get?: string }; detail?: string };
+
+/**
+ * POST /v1/models/{owner}/{name}/predictions with "Prefer: wait" (Replicate
+ * holds the request up to 60s); anything still running is polled until done.
+ */
+async function replicatePredict(model: string, input: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
+  const token = env.replicateApiToken();
+  if (!token) throw new ConfigurationError("REPLICATE_API_TOKEN");
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const deadline = Date.now() + timeoutMs;
+  let res: Response;
+  try {
+    res = await fetch(`https://api.replicate.com/v1/models/${model}/predictions`, {
+      method: "POST",
+      headers: { ...headers, Prefer: "wait=60" },
+      body: JSON.stringify({ input }),
+      signal: AbortSignal.timeout(Math.min(timeoutMs, 75_000)),
+      cache: "no-store",
+    });
+  } catch (error) {
+    log.warn("replicate request failed", { operation: "ai.replicate", provider: "replicate" }, error);
+    throw new LlmError("provider_error", "Postory's AI didn't respond. Try again.");
+  }
+  let prediction = (await res.json().catch(() => ({}))) as Prediction;
+  if (!res.ok) {
+    log.warn("replicate error response", { operation: "ai.replicate", provider: "replicate", status: res.status });
+    // 402 = out of credit; hand over to the next provider.
+    if (res.status === 401 || res.status === 402 || res.status === 403) throw new LlmError("unavailable", "Postory's AI is switched off right now. Try again later.");
+    if (res.status === 429) throw new LlmError("provider_error", "Postory's AI is busy. Try again in a minute.");
+    throw new LlmError("provider_error", "Postory's AI hit a problem. Try again.");
+  }
+  while (prediction.status === "starting" || prediction.status === "processing") {
+    if (Date.now() > deadline || !prediction.urls?.get) throw new LlmError("provider_error", "Postory's AI took too long. Try again.");
+    await new Promise((r) => setTimeout(r, 1500));
+    const poll = await fetch(prediction.urls.get, { headers, cache: "no-store" }).catch(() => null);
+    if (poll?.ok) prediction = (await poll.json().catch(() => prediction)) as Prediction;
+  }
+  if (prediction.status !== "succeeded") {
+    log.warn("replicate prediction failed", { operation: "ai.replicate", provider: "replicate", status: prediction.status });
+    throw new LlmError("provider_error", "Postory's AI hit a problem. Try again.");
+  }
+  return prediction.output;
+}
+
+/** Replicate's Claude takes a plain prompt, so the schema goes in the instructions and the answer is validated after. */
+async function viaReplicate<S extends z.ZodType>(input: StructuredInput<S>): Promise<unknown> {
+  const prompt =
+    input.turns.length === 1
+      ? input.turns[0].content
+      : input.turns.map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`).join("\n\n");
+  const output = await replicatePredict(
+    input.tier === "fast" ? env.replicateFastModel() : env.replicateTextModel(),
+    {
+      system_prompt: `${input.system}\n\nRespond with only one JSON object that matches this JSON Schema. No prose, no code fences.\n${JSON.stringify(jsonSchemaFor(input.schema))}`,
+      prompt,
+      max_tokens: 4000,
+    },
+    120_000,
+  );
+  const text = Array.isArray(output) ? output.join("") : typeof output === "string" ? output : "";
+  // Tolerate a stray fence or preamble around the object.
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
+}
+
 let groqClient: OpenAI | null = null;
 function groq() {
   const apiKey = env.groqApiKey();
@@ -232,7 +302,9 @@ export async function generateStructured<S extends z.ZodType>(input: StructuredI
       const out =
         provider === "openrouter"
           ? await viaOpenRouter(input)
-          : provider === "gemini"
+          : provider === "replicate"
+            ? await viaReplicate(input)
+            : provider === "gemini"
             ? await viaGemini(input)
             : provider === "groq"
               ? await viaGroq(input)
@@ -267,15 +339,16 @@ export type ImageShape = "square" | "portrait" | "landscape";
 
 /** One image for a post. Gemini's image model by default, OpenAI's as fallback. */
 type ImageResult = { bytes: Buffer; contentType: string; extension: string };
-type ImageProvider = "cloudflare" | "openrouter" | "gemini" | "openai";
+type ImageProvider = "replicate" | "cloudflare" | "openrouter" | "gemini" | "openai";
 
 /**
- * One image for a post. Providers are tried in order — Cloudflare Workers AI,
- * OpenRouter, Gemini, OpenAI — and one that's out of quota or unreachable
+ * One image for a post. Providers are tried in order — Replicate (FLUX),
+ * Cloudflare Workers AI, OpenRouter, Gemini, OpenAI — and one that's out of quota or unreachable
  * hands over to the next.
  */
 export async function generateImageBytes(prompt: string, shape: ImageShape): Promise<ImageResult> {
   const providers: ImageProvider[] = [];
+  if (integrations.replicate()) providers.push("replicate");
   if (integrations.cloudflareAi()) providers.push("cloudflare");
   if (integrations.openrouter()) providers.push("openrouter");
   if (integrations.gemini()) providers.push("gemini");
@@ -296,6 +369,15 @@ export async function generateImageBytes(prompt: string, shape: ImageShape): Pro
 }
 
 async function imageVia(provider: ImageProvider, prompt: string, shape: ImageShape): Promise<ImageResult> {
+  if (provider === "replicate") {
+    const aspectRatio = shape === "portrait" ? "4:5" : shape === "landscape" ? "16:9" : "1:1";
+    const output = await replicatePredict(env.replicateImageModel(), { prompt: prompt.slice(0, 2000), aspect_ratio: aspectRatio, output_format: "jpg", output_quality: 90 }, 150_000);
+    const url = Array.isArray(output) ? output[0] : output;
+    if (typeof url !== "string" || !url.startsWith("https://")) throw new LlmError("invalid_output", "No image came back. Try again.");
+    const file = await fetch(url, { signal: AbortSignal.timeout(60_000), cache: "no-store" }).catch(() => null);
+    if (!file?.ok) throw new LlmError("provider_error", "Image generation hit a problem. Try again.");
+    return { bytes: Buffer.from(await file.arrayBuffer()), contentType: "image/jpeg", extension: "jpg" };
+  }
   if (provider === "openrouter") {
     const aspectRatio = shape === "portrait" ? "4:5" : shape === "landscape" ? "16:9" : "1:1";
     let res: Response;

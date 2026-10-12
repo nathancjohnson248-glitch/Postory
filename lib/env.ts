@@ -55,6 +55,10 @@ export const env = {
   // Groq: fast text fallback (OpenAI-compatible API). No images.
   groqApiKey: () => read("GROQ_API_KEY"),
   groqModel: () => read("GROQ_MODEL") ?? "openai/gpt-oss-120b",
+  replicateApiToken: () => read("REPLICATE_API_TOKEN"),
+  replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "anthropic/claude-sonnet-5",
+  replicateFastModel: () => read("REPLICATE_FAST_MODEL") ?? "anthropic/claude-4.5-haiku",
+  replicateImageModel: () => read("REPLICATE_IMAGE_MODEL") ?? "black-forest-labs/flux-1.1-pro",
   openrouterApiKey: () => read("OPENROUTER_API_KEY"),
   /** The writer: quality first. */
   openrouterModel: () => read("OPENROUTER_MODEL") ?? "anthropic/claude-sonnet-5.5",
@@ -105,6 +109,7 @@ export const integrations = {
   gemini: () => Boolean(env.geminiApiKey()),
   groq: () => Boolean(env.groqApiKey()),
   openrouter: () => Boolean(env.openrouterApiKey()),
+  replicate: () => Boolean(env.replicateApiToken()),
   cloudflareAi: () => Boolean(env.cloudflareAccountId() && env.cloudflareAiToken()),
   openai: () => Boolean(env.openaiApiKey()),
   resend: () => Boolean(env.resendApiKey() && env.resendFromEmail()),
@@ -128,6 +133,7 @@ export function integrationStatus(): IntegrationStatus {
     gemini: integrations.gemini(),
     groq: integrations.groq(),
     openrouter: integrations.openrouter(),
+    replicate: integrations.replicate(),
     cloudflareAi: integrations.cloudflareAi(),
     openai: integrations.openai(),
     resend: integrations.resend(),

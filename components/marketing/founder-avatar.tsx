@@ -1,13 +1,9 @@
 import { cn } from "@/lib/utils";
 
-/** The example founder (Maya, who makes Fernwood) — only for labelled demos. */
+/** The example founder (Maya, who makes Fernwood) — a generated portrait, only for labelled demos. */
 export function FounderAvatar({ className }: { className?: string }) {
   return (
-    <span
-      className={cn("grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#ffd9b8] to-[#f2a77c] text-[13px] font-semibold text-[#6b3416] ring-2 ring-white", className)}
-      aria-hidden
-    >
-      M
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element -- a tiny static avatar; next/image adds nothing here
+    <img src="/demo/founder.webp" alt="" width={128} height={128} className={cn("size-9 shrink-0 rounded-full object-cover ring-2 ring-white", className)} aria-hidden />
   );
 }
