@@ -14,6 +14,7 @@ import { getAdminRole } from "@/lib/auth/admin";
 import { getProfile, requireUser } from "@/lib/auth/session";
 import { billingAvailability, getSubscriptionRow } from "@/lib/billing/service";
 import { PLANS } from "@/lib/billing/plans";
+import { aiAvailable } from "@/lib/ai/client";
 import { getEntitlements, previewGenerationsLeft } from "@/lib/entitlements";
 import { isPlatform, type Platform } from "@/lib/social/platforms";
 import { getNetworkStates } from "@/lib/data/social";
@@ -200,6 +201,19 @@ async function PlanStep({ userId, checkoutParam, eventParam, canSkip }: { userId
 }
 
 async function StoryStep({ userId, businessType }: { userId: string; businessType: string | null }) {
+  if (!aiAvailable()) {
+    return (
+      <div className="mx-auto max-w-xl">
+        <Notice tone="info" title="Postory's writer is being switched on.">
+          It isn&apos;t available on this deployment just yet. Start your trial and your first story will be the first thing you write.
+        </Notice>
+        <div className="mt-8 flex items-center justify-between">
+          <BackButton to="social" />
+          <NextStepButton to="plan" />
+        </div>
+      </div>
+    );
+  }
   const [rows, previewLeft] = await Promise.all([getNetworkStates(userId), previewGenerationsLeft(userId)]);
   const connected = [...new Set(rows.filter((r) => r.accounts.some((a) => a.status === "connected")).map((r) => r.platform))].filter(isPlatform);
   const defaults: Platform[] = connected.length ? connected : ["x", "linkedin", "instagram"];

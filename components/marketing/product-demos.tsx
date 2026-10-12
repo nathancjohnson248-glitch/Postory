@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Check, CheckCheck, Sparkles } from "lucide-react";
 import { PlatformIcon } from "@/components/brand/platform-icon";
@@ -292,6 +292,260 @@ export function MemoryDemo() {
           <p className="mt-2 text-[15px] font-medium text-muted line-through decoration-danger/60">“37 happy customers already love it.”</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+const TYPED_STORIES = [
+  { text: "We launched our iOS app today and got 37 downloads in the first hour.", angles: ["First-hour milestone", "Behind the launch", "What early users get"] },
+  { text: "Our first wholesale order shipped to a shop in Lisbon this morning.", angles: ["A first", "Where it's going", "Thank you to the team"] },
+  { text: "We're open late Friday for a tasting night — six new coffees to try.", angles: ["Event invite", "Meet the coffees", "Why we do it"] },
+];
+
+/** "Tell it what happened": a story typed in, Postory reading it, angles appearing. */
+export function StoryInputDemo() {
+  const reduce = useReducedMotion();
+  const [index, setIndex] = useState(0);
+  const [typed, setTyped] = useState(reduce ? TYPED_STORIES[0].text : "");
+  const [phase, setPhase] = useState<"typing" | "reading" | "angles">(reduce ? "angles" : "typing");
+  const story = TYPED_STORIES[index];
+
+  useEffect(() => {
+    if (reduce) return;
+    let timer: ReturnType<typeof setTimeout>;
+    if (phase === "typing") {
+      if (typed.length < story.text.length) timer = setTimeout(() => setTyped(story.text.slice(0, typed.length + 1)), 28 + Math.random() * 40);
+      else timer = setTimeout(() => setPhase("reading"), 500);
+    } else if (phase === "reading") {
+      timer = setTimeout(() => setPhase("angles"), 1700);
+    } else {
+      timer = setTimeout(() => {
+        setIndex((i) => (i + 1) % TYPED_STORIES.length);
+        setTyped("");
+        setPhase("typing");
+      }, 4200);
+    }
+    return () => clearTimeout(timer);
+  }, [phase, typed, story.text, reduce]);
+
+  const steps = ["Understanding what happened", "Pulling facts from your memory", "Finding the angles"];
+
+  return (
+    <div className="overflow-hidden rounded-[28px] bg-surface shadow-lift ring-1 ring-line">
+      <div className="flex items-center justify-between border-b border-line px-5 py-3">
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">What happened?</p>
+        <DemoTag />
+      </div>
+      <div className="min-h-[148px] px-6 pb-4 pt-6">
+        <p className="font-display text-[26px] leading-[1.25] tracking-[-0.01em] text-ink sm:text-[30px]">
+          {typed}
+          {phase === "typing" ? <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[3px] animate-[caret-blink_1s_steps(1)_infinite] bg-blue-500 align-baseline" aria-hidden /> : null}
+        </p>
+      </div>
+      <div className="border-t border-line bg-paper/60 px-6 py-5">
+        <ul className="flex flex-col gap-2.5">
+          {steps.map((s, i) => {
+            const done = phase === "angles" || (phase === "reading" && i < 2);
+            const active = phase === "reading" && i === 2;
+            return (
+              <li key={s} className={cn("flex items-center gap-2.5 text-[13.5px] transition-colors duration-500", done ? "text-ink-soft" : active ? "text-ink" : "text-faint")}>
+                <span className={cn("grid size-5 place-items-center rounded-full transition-colors duration-500", done ? "bg-blue-500 text-white" : active ? "bg-blue-50 ring-1 ring-blue-200" : "bg-wash")}>
+                  {done ? <Check className="size-3" aria-hidden /> : active ? <span className="size-1.5 animate-pulse rounded-full bg-blue-500" /> : null}
+                </span>
+                {s}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-5 flex min-h-8 flex-wrap gap-1.5">
+          <AnimatePresence mode="popLayout">
+            {phase === "angles"
+              ? story.angles.map((a, i) => (
+                  <motion.span
+                    key={`${index}-${a}`}
+                    initial={{ opacity: 0, y: 6, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1, transition: { delay: i * 0.12, type: "spring", stiffness: 300, damping: 24 } }}
+                    exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                    className="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1.5 text-[12.5px] font-medium text-blue-700"
+                  >
+                    <Sparkles className="size-3" aria-hidden />
+                    {a}
+                  </motion.span>
+                ))
+              : null}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const RATIOS = [
+  { id: "4:5", label: "Instagram", aspect: "aspect-[4/5]" },
+  { id: "1:1", label: "Square", aspect: "aspect-square" },
+  { id: "16:9", label: "X & LinkedIn", aspect: "aspect-[16/9]" },
+] as const;
+
+/** "Need a visual?": the image fits the network it's going to. */
+export function ImageDemo() {
+  const reduce = useReducedMotion();
+  const [ratio, setRatio] = useState<(typeof RATIOS)[number]["id"]>("4:5");
+  const [made, setMade] = useState(Boolean(reduce));
+  const current = RATIOS.find((r) => r.id === ratio)!;
+  return (
+    <div className="rounded-3xl bg-surface p-5 shadow-lift ring-1 ring-line sm:p-6">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2 text-[13px] font-semibold">
+          <PlatformIcon platform="instagram" tile className="size-6 rounded-[7px]" />
+          Instagram · Behind the launch
+        </span>
+        <DemoTag />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Image size">
+        {RATIOS.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            role="radio"
+            aria-checked={ratio === r.id}
+            onClick={() => setRatio(r.id)}
+            className={cn("rounded-full px-3 py-1.5 text-[12.5px] font-medium ring-1 transition-all", ratio === r.id ? "bg-ink text-white ring-ink" : "text-ink-soft ring-line hover:ring-line-strong")}
+          >
+            {r.id} <span className={ratio === r.id ? "text-white/60" : "text-faint"}>· {r.label}</span>
+          </button>
+        ))}
+      </div>
+      <motion.div layout transition={{ type: "spring", stiffness: 220, damping: 28 }} className={cn("relative mx-auto mt-4 w-full max-w-sm overflow-hidden rounded-2xl bg-wash", current.aspect)}>
+        <AnimatePresence initial={false}>
+          {made ? (
+            <motion.div key="img" initial={{ opacity: 0, filter: "blur(16px)", scale: 1.04 }} animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }} className="absolute inset-0">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static demo art */}
+              <img src="/demo/fernwood-launch.svg" alt="Example generated visual: a phone showing the Fernwood app on a calm green background" className="size-full object-cover" />
+            </motion.div>
+          ) : (
+            <div className="absolute inset-0 grid place-items-center">
+              <button
+                type="button"
+                onClick={() => setMade(true)}
+                className="flex items-center gap-2 rounded-xl bg-surface px-4 py-2.5 text-[13.5px] font-medium shadow-soft ring-1 ring-line transition-all hover:-translate-y-0.5 hover:shadow-lift"
+              >
+                <Sparkles className="size-4 text-blue-600" aria-hidden /> Create image
+              </button>
+            </div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+      <p className="mt-4 text-[12.5px] leading-relaxed text-muted">
+        Made for this post and this network. Prefer your own photo? Upload it instead — Postory never invents photos of real people or events.
+      </p>
+    </div>
+  );
+}
+
+const DEMO_INBOX = [
+  { platform: "x" as const, who: "Maya R.", text: "Is there an Android version?", reply: "Not yet — Fernwood is iPhone-only for now. We'll post here the moment that changes." },
+  { platform: "linkedin" as const, who: "Tom Becker", text: "Congrats on the launch! What made you build this?", reply: "Thank you, Tom! We wanted a habit tracker that felt calm instead of guilt-trippy — that's the whole idea." },
+  { platform: "instagram" as const, who: "@sunnydays", text: "love the colours 😍", reply: "Thank you! The greens were the hardest part to get right." },
+];
+
+/** "Replies shouldn't live in seven apps": one inbox, a drafted reply waiting for approval. */
+export function InboxDemo() {
+  const [open, setOpen] = useState(0);
+  const [sent, setSent] = useState<Set<number>>(new Set());
+  return (
+    <div className="overflow-hidden rounded-3xl bg-surface shadow-lift ring-1 ring-line">
+      <div className="flex items-center justify-between border-b border-line px-5 py-4">
+        <p className="text-[15px] font-semibold">Inbox</p>
+        <DemoTag />
+      </div>
+      <ul className="divide-y divide-line">
+        {DEMO_INBOX.map((item, i) => (
+          <li key={item.who}>
+            <button type="button" onClick={() => setOpen(i)} className={cn("flex w-full items-start gap-3 px-5 py-3.5 text-left transition-colors", open === i ? "bg-blue-50/40" : "hover:bg-wash/60")}>
+              <PlatformIcon platform={item.platform} tile className="mt-0.5 size-7 shrink-0 rounded-[9px]" />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 text-[13px] font-semibold">
+                  {item.who}
+                  {sent.has(i) ? <span className="text-[11px] font-medium text-success">Replied</span> : null}
+                </span>
+                <span className="block truncate text-[13.5px] text-ink-soft">{item.text}</span>
+              </span>
+            </button>
+            <AnimatePresence initial={false}>
+              {open === i ? (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="mx-5 mb-4 rounded-2xl bg-paper p-4 ring-1 ring-line">
+                    <p className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-blue-600">
+                      <Sparkles className="size-3" aria-hidden /> Suggested reply
+                    </p>
+                    <p className="mt-2 text-[14px] leading-relaxed text-ink">{item.reply}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSent((s) => new Set(s).add(i))}
+                        disabled={sent.has(i)}
+                        className="flex h-8 items-center gap-1.5 rounded-lg bg-ink px-3 text-[12.5px] font-medium text-white transition-all active:scale-[0.97] disabled:opacity-40"
+                      >
+                        <Check className="size-3.5" aria-hidden /> {sent.has(i) ? "Approved" : "Approve & send"}
+                      </button>
+                      <span className="flex h-8 items-center rounded-lg px-3 text-[12.5px] font-medium text-muted ring-1 ring-line">Edit</span>
+                      <span className="flex h-8 items-center rounded-lg px-3 text-[12.5px] font-medium text-muted ring-1 ring-line">Ignore</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const MEMORY_EVENTS = [
+  { source: "From your story", fact: "Launched on iOS — 37 downloads in the first hour.", tone: "blue" },
+  { source: "From your answer", fact: "Postory asked what's next. You said: dark mode, this month.", tone: "green" },
+  { source: "You added", fact: "Don't mention Android until it's announced.", tone: "ink" },
+  { source: "Your voice", fact: "Casual and short. Lowercase is fine on X.", tone: "amber" },
+] as const;
+
+/** "Postory remembers": memory grows from stories, approvals and what you add. */
+export function MemoryLearnsDemo() {
+  return (
+    <div className="rounded-3xl bg-surface p-6 shadow-lift ring-1 ring-line">
+      <div className="flex items-center justify-between">
+        <p className="text-[15px] font-semibold">What Postory knows</p>
+        <DemoTag />
+      </div>
+      <ol className="relative mt-5 flex flex-col gap-4 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-px before:bg-line">
+        {MEMORY_EVENTS.map((e, i) => (
+          <motion.li
+            key={e.fact}
+            initial={{ opacity: 0, x: -8 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ delay: i * 0.14, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="relative pl-7"
+          >
+            <span
+              className={cn(
+                "absolute left-0 top-1 size-[15px] rounded-full ring-4 ring-surface",
+                e.tone === "blue" ? "bg-blue-500" : e.tone === "green" ? "bg-success" : e.tone === "amber" ? "bg-warning" : "bg-ink",
+              )}
+              aria-hidden
+            />
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint">{e.source}</p>
+            <p className="mt-1 text-[14.5px] text-ink-soft">{e.fact}</p>
+          </motion.li>
+        ))}
+      </ol>
+      <p className="mt-5 border-t border-line pt-4 text-[12.5px] leading-relaxed text-muted">Every memory is visible, editable and deletable in Settings. Nothing is saved without you.</p>
     </div>
   );
 }

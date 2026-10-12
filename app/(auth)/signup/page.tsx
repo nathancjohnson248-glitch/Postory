@@ -13,7 +13,7 @@ export default async function SignupPage() {
     <>
       <h1 className="font-display text-[44px] leading-none tracking-[-0.02em]">Start with a story.</h1>
       <p className="mb-8 mt-3 text-[15px] leading-relaxed text-muted">
-        {codes ? "No password to remember — we'll email you a 6-digit code." : "Create your account. Your 3-day trial starts when you pick a plan."}
+        {codes ? "No password to remember — we'll email you a one-time code." : "Create your account. Your 3-day trial starts when you pick a plan."}
       </p>
       <SignupForm google={auth.google} codes={codes} />
       <ul className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-muted">

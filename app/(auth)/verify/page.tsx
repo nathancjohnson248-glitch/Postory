@@ -17,7 +17,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
     <>
       <h1 className="font-display text-[44px] leading-none tracking-[-0.02em]">Check your email.</h1>
       <p className="mb-8 mt-3 text-[15px] leading-relaxed text-muted text-pretty">
-        {reason === "unconfirmed" ? "Your email isn't confirmed yet, so we sent a fresh code to " : "We sent a 6-digit code to "}
+        {reason === "unconfirmed" ? "Your email isn't confirmed yet, so we sent a fresh code to " : `We sent a ${pending.codeLength}-digit code to `}
         <span className="font-medium text-ink">{pending.email}</span>. Enter it below to{" "}
         {reason === "unconfirmed" || !pending.fresh ? "log in" : "create your account"}.
       </p>

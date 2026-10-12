@@ -109,11 +109,11 @@ export function AboutStep({ defaults }: { defaults: { name: string; businessType
         {e.businessType ? <p className="mt-3 text-center text-[13px] text-danger">{e.businessType}</p> : null}
       </fieldset>
 
-      <div className="sticky bottom-4 z-10 flex flex-col items-center gap-2 sm:static">
-        <div className="w-full rounded-2xl bg-paper/80 p-2 backdrop-blur sm:w-auto sm:bg-transparent sm:p-0">
+      <div className="sticky bottom-0 z-10 -mx-6 border-t border-line bg-paper/90 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <div className="flex flex-col items-stretch gap-2 sm:items-center">
           <ContinueButton>Continue</ContinueButton>
+          <p className="hidden text-center text-[13px] text-muted sm:block">This helps Postory understand which stories are worth posting for you.</p>
         </div>
-        <p className="text-center text-[13px] text-muted">This helps Postory understand which stories are worth posting for you.</p>
       </div>
     </form>
   );

@@ -154,7 +154,7 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
                           full && "cursor-not-allowed opacity-40",
                         )}
                       >
-                        <PlatformIcon platform={p} className="size-3.5" />
+                        <PlatformIcon platform={p} className={cn("size-3.5", on ? "text-white" : "text-ink")} />
                         {PLATFORM_META[p].name}
                       </button>
                     );

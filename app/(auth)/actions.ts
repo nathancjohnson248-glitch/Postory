@@ -183,7 +183,7 @@ export async function signUp(_prev: AuthFormState, formData: FormData): Promise<
 }
 
 /**
- * Passwordless: email → 6-digit code, for new and returning people alike.
+ * Passwordless: email → one-time code, for new and returning people alike.
  * Only offered when Postory sends its own email ("codes" mode).
  */
 export async function requestEmailCode(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {

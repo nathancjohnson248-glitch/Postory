@@ -145,7 +145,7 @@ export function NetworkList({
           else state = { label: "Not connected", tone: "text-muted", icon: null };
 
           return (
-            <li key={row.platform} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
+            <li key={row.platform} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-4 sm:px-5">
               <div className="flex min-w-0 flex-1 items-center gap-3.5">
                 <PlatformIcon platform={row.platform} tile className="size-10 rounded-xl" />
                 <div className="min-w-0">
