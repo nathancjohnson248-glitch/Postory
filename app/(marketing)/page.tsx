@@ -1,25 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, CheckCheck, ImageIcon, Mail, MessageSquareText, PenLine } from "lucide-react";
+import { ArrowRight, Mail } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { PlanCards } from "@/components/billing/plan-cards";
-import { Compare } from "@/components/marketing/compare";
-import { NetworkOrbit } from "@/components/marketing/network-orbit";
+import { AiEngine } from "@/components/marketing/ai-engine";
+import { Capabilities } from "@/components/marketing/capabilities";
 import { Faq } from "@/components/marketing/faq";
-import { FounderLine } from "@/components/marketing/founder-line";
-import { HeroConversation } from "@/components/marketing/hero-conversation";
-import {
-  AnalyticsDemo,
-  ApprovalDemo,
-  CalendarDemo,
-  HeroProduct,
-  ImageDemo,
-  InboxDemo,
-  MemoryDemo,
-  MemoryLearnsDemo,
-  PlatformVersions,
-  StoryInputDemo,
-} from "@/components/marketing/product-demos";
+import { NetworkOrbit } from "@/components/marketing/network-orbit";
+import { ApprovalDemo, MemoryDemo } from "@/components/marketing/product-demos";
 import { Reveal } from "@/components/marketing/reveal";
 import { RiseText } from "@/components/motion/rise-text";
 import { Spotlight } from "@/components/motion/spotlight";
@@ -94,14 +82,13 @@ export default function HomePage() {
                   className: "h-13 px-6 text-[16px]",
                 })}
               >
-                See Postory in action
+                Watch the AI work
               </Link>
             </div>
-            <HeroConversation className="fade-rise mt-12 sm:mt-14" />
           </div>
-          <div id="product" className="stage-in mx-auto mt-12 max-w-6xl scroll-mt-24 sm:mt-16" style={{ animationDelay: "0.8s" }}>
-            <HeroProduct />
-          </div>
+        </div>
+        <div id="how-it-works" className="stage-in mx-auto max-w-[1320px] scroll-mt-20 px-3 pb-16 sm:px-6 sm:pb-24" style={{ animationDelay: "0.8s" }}>
+          <AiEngine />
         </div>
       </section>
 
@@ -110,7 +97,7 @@ export default function HomePage() {
         <div className="hairline-grid absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" aria-hidden />
         <div className="relative mx-auto max-w-7xl px-5 pb-10 pt-14 sm:px-8 sm:pb-14 sm:pt-20">
           <Reveal>
-            <p className="text-center font-mono text-[11px] uppercase tracking-[0.16em] text-blue-600">Eight networks · one story</p>
+            <p className="text-center font-mono text-[11px] uppercase tracking-[0.16em] text-blue-600">One story · every network</p>
             <h2 className="mx-auto mt-3 max-w-xl text-center font-display text-[32px] leading-[1.05] tracking-[-0.02em] text-balance sm:text-[44px]">
               One story out to <em>every network you use.</em>
             </h2>
@@ -118,81 +105,6 @@ export default function HomePage() {
           <div className="mt-6 sm:mt-4">
             <NetworkOrbit />
           </div>
-        </div>
-      </section>
-
-      {/* Tell it what happened */}
-      <section id="how-it-works" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-28">
-        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] lg:gap-14">
-          <Reveal>
-            <SectionIntro
-              eyebrow="Tell it what happened"
-              title={
-                <>
-                  One sentence in. <em>Postory does the thinking.</em>
-                </>
-              }
-              body="Type it, paste it or say it out loud — a launch, a hire, a first customer, a busy Saturday. Postory works out what happened, pulls the facts it knows about your business, and finds the angles worth posting."
-            />
-            <ol className="mt-8 flex flex-col gap-4">
-              {[
-                {
-                  icon: PenLine,
-                  title: "You tell it what happened",
-                  body: "In your own words. No prompts, no templates.",
-                },
-                {
-                  icon: MessageSquareText,
-                  title: "It writes for every network",
-                  body: "Same facts, a native version for each place you post.",
-                },
-                {
-                  icon: CheckCheck,
-                  title: "You approve. It publishes.",
-                  body: "Edit anything. Nothing goes out without your OK.",
-                },
-              ].map((step, i) => (
-                <li key={step.title} className="flex gap-4">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600">
-                    <step.icon className="size-[18px]" aria-hidden />
-                  </span>
-                  <div>
-                    <p className="text-[15.5px] font-semibold">
-                      <span className="mr-2 font-mono text-[11px] text-faint">0{i + 1}</span>
-                      {step.title}
-                    </p>
-                    <p className="mt-0.5 text-[14.5px] text-muted">{step.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <StoryInputDemo />
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Story → posts */}
-      <section className="bg-surface py-20 sm:py-28">
-        <div className="mx-auto max-w-7xl px-5 sm:px-8">
-          <Reveal>
-            <SectionIntro
-              eyebrow="Every network"
-              title={
-                <>
-                  How one line becomes <em>a post for every network.</em>
-                </>
-              }
-              body="Each network has its own rhythm. Postory changes the structure, length and tone for each one — it doesn't reword the same paragraph. Ask for a change to one version and the others stay exactly as they are."
-            />
-          </Reveal>
-          <Reveal delay={0.05} className="mt-10 sm:mt-14">
-            <FounderLine />
-          </Reveal>
-          <Reveal delay={0.1} className="mt-5 sm:mt-6">
-            <PlatformVersions />
-          </Reveal>
         </div>
       </section>
 
@@ -234,128 +146,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Visuals */}
-      <section className="py-20 sm:py-28">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 sm:px-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-14">
-          <Reveal className="order-2 lg:order-1">
-            <ImageDemo />
-          </Reveal>
-          <Reveal className="order-1 lg:order-2">
-            <SectionIntro
-              eyebrow="Visuals"
-              title={
-                <>
-                  Need a visual? <em>Make one.</em>
-                </>
-              }
-              body="Create an image for the post you're looking at, sized for where it's going — portrait for Instagram, wide for X and LinkedIn. Or upload your own. Instagram and Pinterest posts always get the image they need before they can go out."
-            />
-            <p className="mt-6 flex items-center gap-2 text-[14px] text-muted">
-              <ImageIcon className="size-4 text-blue-600" aria-hidden /> Every plan includes AI images each month.
-            </p>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Calendar */}
+      {/* Everything around the story */}
       <section className="bg-surface py-20 sm:py-28">
-        <div className="mx-auto grid grid-cols-1 max-w-7xl items-center gap-10 lg:gap-14 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+        <div className="mx-auto max-w-7xl px-5 sm:px-8">
           <Reveal>
             <SectionIntro
-              eyebrow="Calendar"
+              eyebrow="Around every story"
               title={
                 <>
-                  Your whole social week, <em>in one place.</em>
+                  The same AI, <em>on every job after the post.</em>
                 </>
               }
-              body="See what's going out and when, in your timezone. Drag a post to another day to move it. Postory sends scheduled posts itself at the time you set, and tells you if a network refuses one."
-            />
-            <ul className="mt-8 flex flex-col gap-3 text-[15px] text-ink-soft">
-              {["Month and agenda views", "Drag to reschedule", "Approved posts ready to plan"].map((t) => (
-                <li key={t} className="flex items-center gap-2.5">
-                  <CalendarDays className="size-4 text-blue-600" aria-hidden /> {t}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <CalendarDemo />
-          </Reveal>
-        </div>
-      </section>
-
-      {/* Inbox */}
-      <section className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-2 lg:gap-14">
-        <Reveal>
-          <SectionIntro
-            eyebrow="Inbox · rolling out"
-            title={
-              <>
-                Replies shouldn&apos;t live in <em>seven apps.</em>
-              </>
-            }
-            body="Comments and mentions from your connected accounts land in one inbox, each with a reply drafted from what Postory knows about your business. Edit it, approve it, or ignore it — replies are never sent on their own. Networks are switching on one by one."
-          />
-        </Reveal>
-        <Reveal delay={0.1}>
-          <InboxDemo />
-        </Reveal>
-      </section>
-
-      {/* Analytics */}
-      <section className="bg-surface py-20 sm:py-28">
-        <div className="mx-auto grid grid-cols-1 max-w-7xl items-center gap-10 lg:gap-14 px-5 sm:px-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-          <Reveal className="order-2 lg:order-1">
-            <AnalyticsDemo />
-          </Reveal>
-          <Reveal className="order-1 lg:order-2">
-            <SectionIntro
-              eyebrow="Analytics"
-              title={
-                <>
-                  See what&apos;s <em>actually working.</em>
-                </>
-              }
-              body="Plain sentences first, charts second: what went out, where it went, which stories travelled furthest. Numbers come straight from the networks that share them — Postory never fills gaps with guesses."
+              body="Planning what's next, answering comments, making visuals, keeping your schedule and reading back what worked. All of it starts from the stories you tell Postory."
             />
           </Reveal>
-        </div>
-      </section>
-
-      {/* Remembers */}
-      <section className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-10 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-2 lg:gap-14">
-        <Reveal>
-          <SectionIntro
-            eyebrow="Business memory"
-            title={
-              <>
-                Postory <em>remembers.</em>
-              </>
-            }
-            body="When Postory asks a question, your answer can be saved for next time — along with the facts you add and the voice you set. Each story starts with more of what's true about your business, and you can see, edit or delete everything it knows."
-          />
-        </Reveal>
-        <Reveal delay={0.1}>
-          <MemoryLearnsDemo />
-        </Reveal>
-      </section>
-
-      {/* Compare */}
-      <section className="bg-surface">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 px-5 py-20 sm:px-8 sm:py-28 items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-14">
-          <Reveal>
-            <SectionIntro
-              eyebrow="Why Postory"
-              title={
-                <>
-                  Not a scheduler. <em>Not a chatbot.</em>
-                </>
-              }
-              body="A scheduler posts what you've already written. A chatbot writes whatever you ask, true or not. Postory does the part in between: it turns what actually happened into posts you'd be happy to put your name on — then gets them out."
-            />
-          </Reveal>
-          <Reveal delay={0.1}>
-            <Compare />
+          <Reveal delay={0.1} className="mt-10 sm:mt-14">
+            <Capabilities />
           </Reveal>
         </div>
       </section>

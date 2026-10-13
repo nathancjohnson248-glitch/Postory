@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 import { ConfigurationError, env, integrations } from "@/lib/env";
+import { OWNER_EMAILS } from "@/lib/auth/admin";
+import { sendEmail } from "@/lib/email/send";
 import { log } from "@/lib/log";
 
 /**
@@ -47,6 +49,26 @@ function jsonSchemaFor(schema: z.ZodType) {
 
 // --- Replicate ------------------------------------------------------------------
 
+let lastAlert = 0;
+
+/** Email the owner (at most every six hours) when Replicate refuses Postory's account. */
+function alertOwner(reason: "credit" | "token" | "model", model: string) {
+  if (Date.now() - lastAlert < 6 * 3_600_000) return;
+  lastAlert = Date.now();
+  log.error("replicate refused the account", { operation: "ai.replicate.account", provider: "replicate", reason, model });
+  void sendEmail(OWNER_EMAILS[0], "ownerAlert", {
+    title: reason === "credit" ? "Replicate is out of credit" : reason === "token" ? "Replicate rejected Postory's token" : `Replicate can't find ${model}`,
+    body:
+      reason === "credit"
+        ? "Every AI request (writing posts, the assistant, images) is failing until credit is added. Add credit at replicate.com/account/billing; Postory recovers by itself as soon as it's there."
+        : reason === "token"
+          ? "Check REPLICATE_API_TOKEN in Railway. Every AI request fails until it's fixed."
+          : `Check REPLICATE_TEXT_MODEL / REPLICATE_FAST_MODEL / REPLICATE_IMAGE_MODEL in Railway: "${model}" didn't resolve.`,
+    actionLabel: reason === "credit" ? "Add Replicate credit" : "Open Railway",
+    actionUrl: reason === "credit" ? "https://replicate.com/account/billing" : "https://railway.com/dashboard",
+  }).catch(() => undefined);
+}
+
 type Prediction = { id?: string; status?: string; output?: unknown; error?: unknown; urls?: { get?: string } };
 
 /**
@@ -78,9 +100,12 @@ async function predict(model: string, input: Record<string, unknown>, timeoutMs:
   let prediction = (await res.json().catch(() => ({}))) as Prediction;
   if (!res.ok) {
     log.warn("replicate error response", { operation: `ai.replicate.${what}`, provider: "replicate", model, status: res.status });
-    if (res.status === 401 || res.status === 403) throw new LlmError("unavailable", `${noun} isn't available right now. The owner has been told; try again later.`);
-    if (res.status === 402) throw new LlmError("unavailable", `${noun} is paused while Postory tops up its model credit. Try again later.`);
-    if (res.status === 404) throw new LlmError("unavailable", `${noun} isn't set up correctly on this deployment.`);
+    // Account problems (no credit, bad token, wrong model) are ours to fix, not
+    // the customer's: tell the owner, and give the customer a plain message.
+    if (res.status === 401 || res.status === 402 || res.status === 403 || res.status === 404) {
+      alertOwner(res.status === 402 ? "credit" : res.status === 404 ? "model" : "token", model);
+      throw new LlmError("unavailable", `${noun} couldn't respond just now. Anything you wrote is saved, so try again in a few minutes.`);
+    }
     if (res.status === 422) throw new LlmError("provider_error", `${noun} couldn't take that request. Try rewording it.`);
     if (res.status === 429) throw new LlmError("provider_error", `${noun} is busy. Try again in a minute.`);
     throw new LlmError("provider_error", `${noun} hit a problem. Nothing was lost, so try again.`);

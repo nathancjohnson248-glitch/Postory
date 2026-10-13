@@ -215,6 +215,13 @@ export const templates = {
     };
   },
 
+  /** Operational alert for the owner only (e.g. the AI provider ran out of credit). */
+  ownerAlert: (input: { title: string; body: string; actionLabel: string; actionUrl: string }) => ({
+    subject: `Postory alert: ${input.title}`,
+    text: `${input.body}\n\n${input.actionLabel}: ${input.actionUrl}`,
+    html: layout({ preheader: input.title, body: h1(input.title) + p(input.body) + button(input.actionLabel, input.actionUrl) }),
+  }),
+
   connectionIssue: (input: { network: string }) => ({
     subject: `Reconnect ${input.network} to keep posting`,
     text: `Postory can no longer post to ${input.network}. Reconnect it at ${site.url}/app/connections`,
