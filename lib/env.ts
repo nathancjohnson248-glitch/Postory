@@ -40,13 +40,14 @@ export const env = {
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
   handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
-  // GitHub Models writes all text (OpenAI-compatible chat completions).
-  githubModelsToken: () => read("GITHUB_MODELS_TOKEN"),
-  githubModelsBaseUrl: () => (read("GITHUB_MODELS_BASE_URL") ?? "https://models.github.ai/inference").replace(/\/+$/, ""),
-  githubModelsModel: () => read("GITHUB_MODELS_MODEL") ?? "meta-llama-3-70b-instruct",
-  githubModelsFastModel: () => read("GITHUB_MODELS_FAST_MODEL") ?? read("GITHUB_MODELS_MODEL") ?? "meta-llama-3-70b-instruct",
-  /** Output budget per request. Llama 3 70B has an 8k-token window shared with the prompt. */
-  githubModelsMaxTokens: () => Number(read("GITHUB_MODELS_MAX_TOKENS") ?? 3000),
+  // All text goes to one OpenAI-compatible chat completions API (Groq, OpenAI,
+  // DeepSeek, Together, Azure AI Foundry, OpenRouter, SambaNova...). Switch
+  // providers by changing these three; no code change needed.
+  aiTextBaseUrl: () => read("AI_TEXT_BASE_URL")?.replace(/\/+$/, ""),
+  aiTextApiKey: () => read("AI_TEXT_API_KEY"),
+  aiTextModel: () => read("AI_TEXT_MODEL") ?? "",
+  aiTextFastModel: () => read("AI_TEXT_FAST_MODEL") ?? read("AI_TEXT_MODEL") ?? "",
+  aiTextMaxTokens: () => Number(read("AI_TEXT_MAX_TOKENS") ?? 4000),
   // Replicate makes images only.
   replicateApiToken: () => read("REPLICATE_API_TOKEN"),
   replicateImageModel: () => read("REPLICATE_IMAGE_MODEL") ?? "black-forest-labs/flux-1.1-pro",
@@ -84,7 +85,7 @@ export const integrations = {
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   replicate: () => Boolean(env.replicateApiToken()),
-  githubModels: () => Boolean(env.githubModelsToken()),
+  aiText: () => Boolean(env.aiTextBaseUrl() && env.aiTextApiKey() && env.aiTextModel()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
   zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
   /** Postory can send email from its own address (Zoho or SMTP). */
@@ -101,7 +102,7 @@ export function integrationStatus(): IntegrationStatus {
     privy: integrations.privy(),
     handypay: integrations.handypay(),
     replicate: integrations.replicate(),
-    githubModels: integrations.githubModels(),
+    aiText: integrations.aiText(),
     smtp: integrations.smtp(),
     zoho: integrations.zoho(),
     email: integrations.email(),

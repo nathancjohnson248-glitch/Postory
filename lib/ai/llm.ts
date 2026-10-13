@@ -9,11 +9,11 @@ import { log } from "@/lib/log";
 /**
  * Postory's one door to its models, all server-side:
  *
- *   text    GitHub Models, OpenAI-compatible chat completions
- *           GITHUB_MODELS_BASE_URL  (default https://models.github.ai/inference)
- *           GITHUB_MODELS_TOKEN     a GitHub token with the models:read permission
- *           GITHUB_MODELS_MODEL     (default meta-llama-3-70b-instruct)
- *           GITHUB_MODELS_FAST_MODEL (quick checks; defaults to the same model)
+ *   text    any OpenAI-compatible chat completions API
+ *           AI_TEXT_BASE_URL   e.g. https://api.groq.com/openai/v1
+ *           AI_TEXT_API_KEY
+ *           AI_TEXT_MODEL      the writer
+ *           AI_TEXT_FAST_MODEL quick checks (defaults to AI_TEXT_MODEL)
  *   images  Replicate only: REPLICATE_API_TOKEN, REPLICATE_IMAGE_MODEL (FLUX 1.1 Pro)
  *
  * Every text call puts the JSON Schema in the instructions, extracts the
@@ -34,8 +34,8 @@ export class LlmError extends Error {
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
-export function llmProvider(): "github" | null {
-  return integrations.githubModels() ? "github" : null;
+export function llmProvider(): "text" | null {
+  return integrations.aiText() ? "text" : null;
 }
 
 export function imageAvailable() {
@@ -56,7 +56,7 @@ function alertOwner(key: string, alert: { title: string; body: string; actionLab
   void sendEmail(OWNER_EMAILS[0], "ownerAlert", alert).catch(() => undefined);
 }
 
-// --- Text: GitHub Models ------------------------------------------------------------
+// --- Text: OpenAI-compatible chat completions ------------------------------------------------------------
 
 type StructuredInput<S extends z.ZodType> = {
   system: string;
@@ -100,11 +100,12 @@ export function chatRequest(input: { model: string; system: string; turns: ChatT
   };
 }
 
-/** POST {base}/chat/completions with the GitHub token. Returns the assistant's text. */
+/** POST {base}/chat/completions with the API key. Returns the assistant's text. */
 async function chatCompletion(model: string, system: string, turns: ChatTurn[], maxTokens: number): Promise<string> {
-  const token = env.githubModelsToken();
-  if (!token) throw new ConfigurationError("GITHUB_MODELS_TOKEN");
-  const url = `${env.githubModelsBaseUrl()}/chat/completions`;
+  const token = env.aiTextApiKey();
+  const base = env.aiTextBaseUrl();
+  if (!token || !base) throw new ConfigurationError("AI_TEXT_API_KEY");
+  const url = `${base}/chat/completions`;
 
   for (let attempt = 0; ; attempt++) {
     let res: Response;
@@ -117,18 +118,19 @@ async function chatCompletion(model: string, system: string, turns: ChatTurn[], 
         cache: "no-store",
       });
     } catch (error) {
-      log.warn("github models request failed", { operation: "ai.github", provider: "github", model, url, cause: String((error as { cause?: unknown }).cause ?? "") }, error);
+      log.warn("ai text request failed", { operation: "ai.text", provider: base, model, url, cause: String((error as { cause?: unknown }).cause ?? "") }, error);
       throw new LlmError("provider_error", `Postory's AI didn't respond. ${SAVED}`);
     }
 
     const data = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } };
     if (res.ok) {
+      // A plain "OK" page (a retired or wrong endpoint) is not a chat completion.
       const text = data.choices?.[0]?.message?.content;
       if (typeof text !== "string") throw new LlmError("invalid_output", "Postory's AI returned nothing. Try again.");
       return text;
     }
 
-    log.warn("github models error response", { operation: "ai.github", provider: "github", model, status: res.status, code: data.error?.code });
+    log.warn("ai text error response", { operation: "ai.text", provider: base, model, status: res.status, code: data.error?.code });
     if (res.status === 429) {
       // A per-minute limit clears quickly: wait it out once. A daily cap doesn't.
       const wait = Number(res.headers.get("retry-after")) || 0;
@@ -137,28 +139,28 @@ async function chatCompletion(model: string, system: string, turns: ChatTurn[], 
         continue;
       }
       if (wait > 20) {
-        alertOwner("github-limit", {
-          title: "GitHub Models rate limit reached",
-          body: `GitHub Models is refusing requests for the next ${Math.round(wait / 60)} minutes. The free tier caps requests per day; turn on paid usage for GitHub Models in your GitHub billing settings to lift it.`,
-          actionLabel: "GitHub billing",
-          actionUrl: "https://github.com/settings/billing",
+        alertOwner("text-limit", {
+          title: "Postory's AI provider is rate-limiting",
+          body: `${base} is refusing requests for the next ${Math.round(wait / 60)} minutes. That usually means a free-tier daily cap: upgrade the plan with that provider, or point AI_TEXT_BASE_URL / AI_TEXT_API_KEY / AI_TEXT_MODEL in Railway at another provider.`,
+          actionLabel: "Open Railway",
+          actionUrl: "https://railway.com/dashboard",
         });
       }
       throw new LlmError("provider_error", `Postory's AI is busy right now. ${SAVED}`);
     }
-    if (res.status === 401 || res.status === 403) {
-      alertOwner("github-token", {
-        title: "GitHub Models rejected Postory's token",
-        body: "Check GITHUB_MODELS_TOKEN in Railway: it must be a GitHub token with the models:read permission. Every AI request fails until it's fixed.",
+    if (res.status === 401 || res.status === 402 || res.status === 403) {
+      alertOwner("text-key", {
+        title: res.status === 402 ? "Postory's AI provider is out of credit" : "Postory's AI provider rejected the API key",
+        body: `${base} answered ${res.status}. Add credit there, or fix AI_TEXT_API_KEY in Railway. Every AI request fails until it's fixed.`,
         actionLabel: "Open Railway",
         actionUrl: "https://railway.com/dashboard",
       });
       throw new LlmError("unavailable", `Postory's AI couldn't respond just now. ${SAVED}`);
     }
-    if (res.status === 404 || data.error?.code === "unknown_model") {
-      alertOwner("github-model", {
-        title: `GitHub Models can't find ${model}`,
-        body: `Check GITHUB_MODELS_MODEL / GITHUB_MODELS_FAST_MODEL and GITHUB_MODELS_BASE_URL in Railway: "${model}" didn't resolve at ${env.githubModelsBaseUrl()}.`,
+    if (res.status === 404 || res.status === 410 || /model/i.test(data.error?.code ?? "")) {
+      alertOwner("text-model", {
+        title: `Postory's AI provider can't run ${model}`,
+        body: `${base} answered ${res.status} for "${model}". Check AI_TEXT_BASE_URL, AI_TEXT_MODEL and AI_TEXT_FAST_MODEL in Railway.`,
         actionLabel: "Open Railway",
         actionUrl: "https://railway.com/dashboard",
       });
@@ -177,15 +179,15 @@ async function chatCompletion(model: string, system: string, turns: ChatTurn[], 
  * (callers still apply their own validated schema with length limits).
  */
 export async function generateStructured<S extends z.ZodType>(input: StructuredInput<S>): Promise<z.infer<S>> {
-  if (!integrations.githubModels()) throw new LlmError("unavailable", "Postory's AI isn't set up on this deployment yet.");
+  if (!integrations.aiText()) throw new LlmError("unavailable", "Postory's AI isn't set up on this deployment yet.");
   const fast = input.tier === "fast";
-  const model = fast ? env.githubModelsFastModel() : env.githubModelsModel();
+  const model = fast ? env.aiTextFastModel() : env.aiTextModel();
   const system = withSchema(input.system, input.schema);
 
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const text = await chatCompletion(model, system, input.turns, fast ? env.githubModelsMaxTokens() / 2 : env.githubModelsMaxTokens());
+      const text = await chatCompletion(model, system, input.turns, fast ? Math.round(env.aiTextMaxTokens() / 2) : env.aiTextMaxTokens());
       const result = input.schema.safeParse(extractObject(text));
       if (!result.success) throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
       return result.data;
@@ -193,7 +195,7 @@ export async function generateStructured<S extends z.ZodType>(input: StructuredI
       lastError = error;
       // A malformed answer is worth one more try; anything else goes back to the caller.
       if (!(error instanceof LlmError && error.code === "invalid_output")) throw error;
-      log.warn("model output rejected, retrying", { operation: `ai.${input.name}`, provider: "github", model, attempt });
+      log.warn("model output rejected, retrying", { operation: `ai.${input.name}`, provider: "text", model, attempt });
     }
   }
   throw lastError;
@@ -209,7 +211,7 @@ export async function checkTextModel() {
     name: "health_check",
     tier: "fast",
   });
-  return { ok: result.ok, model: env.githubModelsFastModel(), baseUrl: env.githubModelsBaseUrl(), ms: Date.now() - started };
+  return { ok: result.ok, model: env.aiTextFastModel(), baseUrl: env.aiTextBaseUrl(), ms: Date.now() - started };
 }
 
 // --- Images: Replicate ------------------------------------------------------------

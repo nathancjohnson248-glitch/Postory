@@ -22,27 +22,10 @@ export async function POST(request: NextRequest) {
         ok: false,
         code: error instanceof LlmError ? error.code : "error",
         message: error instanceof Error ? error.message : "failed",
-        baseUrl: env.githubModelsBaseUrl(),
-        model: env.githubModelsFastModel(),
-        // Which models this token can use, to fix a wrong model id quickly.
-        catalog: await catalog(),
+        baseUrl: env.aiTextBaseUrl() ?? null,
+        model: env.aiTextFastModel() || null,
       },
       { status: 502 },
     );
-  }
-}
-
-async function catalog() {
-  try {
-    const res = await fetch("https://models.github.ai/catalog/models", {
-      headers: { Authorization: `Bearer ${env.githubModelsToken()}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
-      signal: AbortSignal.timeout(10_000),
-      cache: "no-store",
-    });
-    if (!res.ok) return { status: res.status };
-    const rows = (await res.json()) as { id: string; rate_limit_tier?: string }[];
-    return rows.filter((m) => /llama|gpt-4\.1|gpt-5|deepseek/i.test(m.id)).map((m) => `${m.id} (${m.rate_limit_tier ?? "?"})`);
-  } catch (error) {
-    return { error: error instanceof Error ? `${error.message} ${String((error as { cause?: unknown }).cause ?? "")}` : "failed" };
   }
 }

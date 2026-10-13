@@ -3,17 +3,17 @@ import { z } from "zod";
 
 beforeEach(() => {
   vi.resetModules();
-  process.env.GITHUB_MODELS_TOKEN = "test-token";
-  process.env.GITHUB_MODELS_BASE_URL = "https://models.example.test/";
-  delete process.env.GITHUB_MODELS_MODEL;
-  delete process.env.GITHUB_MODELS_FAST_MODEL;
+  process.env.AI_TEXT_API_KEY = "test-token";
+  process.env.AI_TEXT_BASE_URL = "https://models.example.test/v1/";
+  process.env.AI_TEXT_MODEL = "writer-model";
+  delete process.env.AI_TEXT_FAST_MODEL;
 });
 afterEach(() => vi.unstubAllGlobals());
 
 const reply = (content: string, status = 200) =>
   new Response(JSON.stringify(status === 200 ? { choices: [{ message: { content } }] } : { error: { code: "x", message: content } }), { status });
 
-describe("GitHub Models text handler", () => {
+describe("OpenAI-compatible text handler", () => {
   it("sends an OpenAI-style chat completion to the configured base URL with the token", async () => {
     const fetch = vi.fn().mockResolvedValue(reply('{"title":"iOS launch"}'));
     vi.stubGlobal("fetch", fetch);
@@ -22,10 +22,10 @@ describe("GitHub Models text handler", () => {
 
     expect(out).toEqual({ title: "iOS launch" });
     const [url, init] = fetch.mock.calls[0];
-    expect(url).toBe("https://models.example.test/chat/completions");
+    expect(url).toBe("https://models.example.test/v1/chat/completions");
     expect(init.headers.Authorization).toBe("Bearer test-token");
     const body = JSON.parse(init.body);
-    expect(body.model).toBe("meta-llama-3-70b-instruct");
+    expect(body.model).toBe("writer-model");
     expect(body.messages[0]).toMatchObject({ role: "system" });
     expect(body.messages[0].content).toContain('"title"'); // schema is in the instructions
     expect(body.messages[1]).toEqual({ role: "user", content: "we shipped" });
@@ -60,8 +60,14 @@ describe("GitHub Models text handler", () => {
     });
   });
 
-  it("is off when no token is configured", async () => {
-    delete process.env.GITHUB_MODELS_TOKEN;
+  it("treats a plain 'OK' page (a retired or wrong endpoint) as a failure, not a reply", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("OK", { status: 200 })));
+    const { generateStructured } = await import("@/lib/ai/llm");
+    await expect(generateStructured({ system: "", turns: [{ role: "user", content: "x" }], schema: z.object({ ok: z.boolean() }), name: "t" })).rejects.toMatchObject({ code: "invalid_output" });
+  });
+
+  it("is off when no key is configured", async () => {
+    delete process.env.AI_TEXT_API_KEY;
     const { generateStructured, llmProvider } = await import("@/lib/ai/llm");
     expect(llmProvider()).toBeNull();
     await expect(generateStructured({ system: "", turns: [], schema: z.object({}), name: "t" })).rejects.toMatchObject({ code: "unavailable" });
