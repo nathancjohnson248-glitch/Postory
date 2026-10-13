@@ -10,7 +10,7 @@ import { log } from "@/lib/log";
  * Postory's one door to its models, all server-side:
  *
  *   text    GitHub Models, OpenAI-compatible chat completions
- *           GITHUB_MODELS_BASE_URL  (default https://models.inference.ai.azure.com)
+ *           GITHUB_MODELS_BASE_URL  (default https://models.github.ai/inference)
  *           GITHUB_MODELS_TOKEN     a GitHub token with the models:read permission
  *           GITHUB_MODELS_MODEL     (default meta-llama-3-70b-instruct)
  *           GITHUB_MODELS_FAST_MODEL (quick checks; defaults to the same model)
@@ -117,7 +117,7 @@ async function chatCompletion(model: string, system: string, turns: ChatTurn[], 
         cache: "no-store",
       });
     } catch (error) {
-      log.warn("github models request failed", { operation: "ai.github", provider: "github", model }, error);
+      log.warn("github models request failed", { operation: "ai.github", provider: "github", model, url, cause: String((error as { cause?: unknown }).cause ?? "") }, error);
       throw new LlmError("provider_error", `Postory's AI didn't respond. ${SAVED}`);
     }
 

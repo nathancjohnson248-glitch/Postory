@@ -42,7 +42,7 @@ export const env = {
 
   // GitHub Models writes all text (OpenAI-compatible chat completions).
   githubModelsToken: () => read("GITHUB_MODELS_TOKEN"),
-  githubModelsBaseUrl: () => (read("GITHUB_MODELS_BASE_URL") ?? "https://models.inference.ai.azure.com").replace(/\/+$/, ""),
+  githubModelsBaseUrl: () => (read("GITHUB_MODELS_BASE_URL") ?? "https://models.github.ai/inference").replace(/\/+$/, ""),
   githubModelsModel: () => read("GITHUB_MODELS_MODEL") ?? "meta-llama-3-70b-instruct",
   githubModelsFastModel: () => read("GITHUB_MODELS_FAST_MODEL") ?? read("GITHUB_MODELS_MODEL") ?? "meta-llama-3-70b-instruct",
   /** Output budget per request. Llama 3 70B has an 8k-token window shared with the prompt. */
