@@ -4,11 +4,11 @@ import "server-only";
  * Postory's social service: the only place application code goes to connect
  * accounts, publish, schedule, or read engagement back.
  *
- *   Nango     X, LinkedIn, Threads, Instagram, Facebook, Pinterest. Nango holds
- *             the OAuth tokens; ./publishers.ts calls each network's API
- *             through Nango's proxy.
- *   Bluesky   app password (Nango has no Bluesky), stored encrypted
- *             (./credentials.ts), used by ./bluesky.ts.
+ *   Zernio    X, LinkedIn, Threads, Instagram, Facebook, Pinterest. Zernio
+ *             holds the OAuth apps and tokens (./zernio.ts); one Zernio
+ *             profile per Postory user.
+ *   Bluesky   app password, stored encrypted (./credentials.ts), used by
+ *             ./bluesky.ts. Direct, so it doesn't cost a Zernio account.
  *   TikTok    not connectable: TikTok only lets audited apps publish.
  *
  * Invariants
@@ -23,7 +23,7 @@ import "server-only";
 
 import { describeSocialError, UserFacingError } from "@/lib/errors";
 import { notifyUser } from "@/lib/email/notify";
-import { integrations } from "@/lib/env";
+import { env, integrations } from "@/lib/env";
 import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { consumeUsage, getEntitlements, assertActivePlan, canConnectAnotherAccount } from "@/lib/entitlements";
@@ -32,9 +32,8 @@ import { MEDIA_BUCKET, parseMedia, type PostMedia } from "@/lib/posts/media";
 import { assertTransition, isPostStatus, type PostStatus } from "@/lib/posts/state-machine";
 import * as bluesky from "./bluesky";
 import { credentialsAvailable, deleteCredential, readCredential, saveCredential } from "./credentials";
-import * as nango from "./nango";
 import { PLATFORMS, PLATFORM_META, validatePostContent, type Platform } from "./platforms";
-import * as publishers from "./publishers";
+import * as zernio from "./zernio";
 import { SocialProviderError, type ConnectionKind, type PostMetrics, type ProviderAccount, type Published, type RemoteComment } from "./types";
 import type { Json, Tables } from "@/types/database";
 
@@ -52,21 +51,21 @@ const STUCK_PUBLISHING_MS = 15 * 60 * 1000;
 export type SocialReadiness = { ready: true } | { ready: false; reason: "provider_not_configured"; message: string };
 
 export async function getSocialReadiness(): Promise<SocialReadiness> {
-  if (integrations.nango() || credentialsAvailable()) return { ready: true };
+  if (integrations.zernio() || credentialsAvailable()) return { ready: true };
   return { ready: false, reason: "provider_not_configured", message: "Connecting networks isn't configured on this Postory deployment yet." };
 }
 
-export type NetworkAvailability = { available: true; method: "session" | "credentials" } | { available: false; reason: string };
+export type NetworkAvailability = { available: true; method: "oauth" | "credentials" } | { available: false; reason: string };
 
 /** Whether each network can be connected right now, and how. */
 export async function networkAvailability(): Promise<Record<Platform, NetworkAvailability>> {
-  const nangoReady = integrations.nango() ? new Set(await nango.availablePlatforms()) : new Set<Platform>();
+  const oauthReady = integrations.zernio();
   const out = {} as Record<Platform, NetworkAvailability>;
   for (const platform of PLATFORMS) {
     const meta = PLATFORM_META[platform];
     if (meta.connect === "none") out[platform] = { available: false, reason: meta.limitation ?? "Not available yet." };
     else if (meta.connect === "app_password") out[platform] = credentialsAvailable() ? { available: true, method: "credentials" } : { available: false, reason: "Bluesky isn't set up on this deployment yet." };
-    else out[platform] = nangoReady.has(platform) ? { available: true, method: "session" } : { available: false, reason: `${meta.name} is being set up. Your other networks work as normal.` };
+    else out[platform] = oauthReady && zernio.ZERNIO_PLATFORM[platform] ? { available: true, method: "oauth" } : { available: false, reason: `${meta.name} is being set up. Your other networks work as normal.` };
   }
   return out;
 }
@@ -121,20 +120,26 @@ async function assertCanConnect(userId: string) {
   }
 }
 
-export type ConnectStart = { kind: "session"; token: string; attemptId: string } | { kind: "credentials"; attemptId: string };
+export type ConnectStart = { kind: "redirect"; url: string; attemptId: string } | { kind: "credentials"; attemptId: string };
+
+/** Where the browser comes back to after the network's consent screen. */
+export type ConnectReturn = "connections" | "onboarding";
 
 /**
- * Begin connecting a network. Nango networks get a short-lived Connect UI
- * token (opened in the browser); Bluesky asks for a handle and app password.
- * The account is stored only once the network confirms it.
+ * Begin connecting a network. OAuth networks get a link to the network's own
+ * consent screen (hosted by Zernio); Bluesky asks for a handle and app
+ * password. The account is stored only once the provider confirms it.
  */
-export async function startConnection(userId: string, platform: Platform): Promise<ConnectStart> {
+export async function startConnection(userId: string, platform: Platform, from: ConnectReturn = "connections"): Promise<ConnectStart> {
   const availability = (await networkAvailability())[platform];
   if (!availability.available) throw new UserFacingError("platform_not_enabled", availability.reason);
-  await assertCanConnect(userId);
+  const existing = await listConnectedAccounts(userId);
+  const reconnect = existing.find((a) => a.platform === platform && a.provider === "zernio" && a.status === "reconnect_required");
+  // Reconnecting an account doesn't add one.
+  if (!reconnect) await assertCanConnect(userId);
 
   const admin = createAdminClient();
-  const before = (await listConnectedAccounts(userId)).filter((a) => a.platform === platform).map((a) => a.external_account_id);
+  const before = existing.filter((a) => a.platform === platform).map((a) => a.external_account_id);
   const { data: attempt, error } = await admin
     .from("social_connection_attempts")
     .insert({ user_id: userId, platform, accounts_before: before })
@@ -144,36 +149,70 @@ export async function startConnection(userId: string, platform: Platform): Promi
 
   if (availability.method === "credentials") return { kind: "credentials", attemptId: attempt.id };
   try {
-    const token = await nango.connectSessionToken(userId, platform);
-    if (!token) throw new UserFacingError("platform_not_enabled", `${PLATFORM_META[platform].name} is being set up. Your other networks work as normal.`);
-    return { kind: "session", token, attemptId: attempt.id };
+    const profileId = await zernio.profileFor(userId);
+    const back = `${env.appUrl()}/api/social/callback?attempt=${attempt.id}&from=${from}`;
+    const url = await zernio.connectUrl(profileId!, platform, back, reconnect?.external_account_id);
+    return { kind: "redirect", url, attemptId: attempt.id };
   } catch (error) {
     const userError = toUserError(error, platform, "connect");
     await markAttempt(attempt.id, "failed", userError?.code ?? "unknown_error", userError?.message ?? "The connection could not be started.");
-    log.warn("connect start failed", { operation: "social.startConnection", userId, provider: "nango", platform }, error);
+    log.warn("connect start failed", { operation: "social.startConnection", userId, provider: "zernio", platform }, error);
     throw userError ?? error;
   }
 }
 
-/** The browser says Nango's Connect UI finished: ask Nango what this user now has connected. */
-export async function completeConnection(userId: string, attemptId: string) {
+/**
+ * The browser came back from the network's consent screen. What it reports is
+ * only a hint: Postory asks Zernio which accounts this user's own profile now
+ * holds, and saves those, within the plan's account limit.
+ */
+export async function completeConnection(userId: string, attemptId: string, reported: { error?: string | null } = {}) {
   const attempt = await loadPendingAttempt(userId, attemptId);
   const platform = attempt.platform as Platform;
+  const name = PLATFORM_META[platform]?.name ?? platform;
+  if (reported.error) {
+    const message =
+      reported.error === "oauth_denied"
+        ? `You cancelled on ${name}, so nothing was connected.`
+        : reported.error === "no_facebook_pages"
+          ? 'Facebook didn\'t share a Page. Connect again, choose "Edit previous settings" and tick the Page Postory should post to.'
+          : `${name} didn't finish connecting. Try again.`;
+    await markAttempt(attempt.id, "failed", reported.error.slice(0, 60), message);
+    throw new UserFacingError("connect_failed", message);
+  }
+
   let accounts: ProviderAccount[];
   try {
-    accounts = (await nangoAccounts(userId)).filter((a) => a.platform === platform);
+    accounts = (await zernioAccounts(userId)).filter((a) => a.platform === platform);
   } catch (error) {
     const userError = toUserError(error, platform, "connect");
     await markAttempt(attempt.id, "failed", userError?.code, userError?.message);
     throw userError ?? error;
   }
   if (!accounts.length) {
-    await markAttempt(attempt.id, "failed", "no_account", `No ${PLATFORM_META[platform].name} account was connected.`);
-    throw new UserFacingError("no_account", `No ${PLATFORM_META[platform].name} account was connected. Try again.`);
+    await markAttempt(attempt.id, "failed", "no_account", `No ${name} account was connected.`);
+    throw new UserFacingError("no_account", `No ${name} account was connected. Try again.`);
   }
-  const saved = await upsertAccounts(userId, accounts, "nango");
+
+  // Accounts beyond the plan's allowance are removed at Zernio again, so they never count.
+  const local = await listConnectedAccounts(userId);
+  const known = new Set(local.map((a) => a.external_account_id));
+  const fresh = accounts.filter((a) => !known.has(a.externalId));
+  const entitlements = await getEntitlements(userId);
+  const limit = entitlements.active ? entitlements.limits.socialAccounts : PLANS.solo.limits.socialAccounts;
+  const room = limit === null ? fresh.length : Math.max(0, limit - local.length);
+  const admitted = fresh.slice(0, room);
+  for (const extra of fresh.slice(room)) {
+    await zernio.disconnect(extra.externalId).catch((error) => log.warn("could not remove over-limit account", { operation: "social.complete", userId, provider: "zernio", platform }, error));
+  }
+  const keep = accounts.filter((a) => known.has(a.externalId) || admitted.includes(a));
+  if (!keep.length) {
+    await markAttempt(attempt.id, "failed", "account_limit", "The plan's account limit is reached.");
+    await assertCanConnect(userId);
+  }
+  const saved = await upsertAccounts(userId, keep, "zernio");
   await markAttempt(attempt.id, "completed");
-  return saved;
+  return { saved, skipped: fresh.length - admitted.length };
 }
 
 const BlueskyHandle = /^@?[a-z0-9.-]+\.[a-z]{2,}$|^did:plc:[a-z0-9]+$/i;
@@ -224,24 +263,11 @@ async function markAttempt(attemptId: string, status: "completed" | "failed" | "
     .eq("id", attemptId);
 }
 
-/** This user's Nango connections (tagged with their id at connect time), with each network's profile. */
-async function nangoAccounts(userId: string): Promise<ProviderAccount[]> {
-  if (!integrations.nango()) return [];
-  const connections = await nango.listConnections(userId);
-  return Promise.all(
-    connections.map(async (c): Promise<ProviderAccount> => {
-      const target = { connectionId: c.connectionId, providerConfigKey: c.providerConfigKey };
-      const who = c.broken ? null : await publishers.profile(c.platform, target).catch(() => null);
-      return {
-        externalId: nango.packAccountId(target),
-        platform: c.platform,
-        displayName: who?.username ? `@${who.username}` : (who?.name ?? null),
-        platformAccountId: who?.id ?? c.connectionId,
-        needsReconnect: c.broken || who === null,
-        metadata: { name: who?.name ?? null, username: who?.username ?? null, picture: who?.avatar ?? null, nangoProvider: c.provider },
-      };
-    }),
-  );
+/** The social accounts on this user's own Zernio profile. */
+async function zernioAccounts(userId: string): Promise<ProviderAccount[]> {
+  if (!integrations.zernio()) return [];
+  const profileId = await zernio.profileFor(userId, false);
+  return profileId ? zernio.listAccounts(profileId) : [];
 }
 
 async function upsertAccounts(userId: string, accounts: ProviderAccount[], provider: ConnectionKind) {
@@ -280,7 +306,7 @@ async function upsertAccounts(userId: string, accounts: ProviderAccount[], provi
 export async function syncAccounts(userId: string) {
   let remote: ProviderAccount[];
   try {
-    remote = await nangoAccounts(userId);
+    remote = await zernioAccounts(userId);
   } catch (error) {
     throw toUserError(error, undefined, "sync") ?? error;
   }
@@ -289,11 +315,12 @@ export async function syncAccounts(userId: string) {
   const { data: disconnected } = await admin.from("social_accounts").select("external_account_id").eq("user_id", userId).eq("status", "disconnected");
   const dropped = new Set((disconnected ?? []).map((r) => r.external_account_id));
   // Don't resurrect accounts the user disconnected in Postory.
-  const toSave = remote.filter((a) => !dropped.has(a.externalId));
-  if (toSave.length) await upsertAccounts(userId, toSave, "nango");
+  // Only refresh accounts Postory already admitted; new ones come in through a connection (which checks the plan).
+  const toSave = remote.filter((a) => !dropped.has(a.externalId) && local.some((l) => l.external_account_id === a.externalId));
+  if (toSave.length) await upsertAccounts(userId, toSave, "zernio");
 
   const remoteIds = new Set(remote.map((a) => a.externalId));
-  const missing = local.filter((a) => a.provider === "nango" && !remoteIds.has(a.external_account_id));
+  const missing = local.filter((a) => a.provider === "zernio" && !remoteIds.has(a.external_account_id));
   // Bluesky: check the stored app password still signs in.
   for (const account of local.filter((a) => a.provider === "bluesky" && a.status === "connected")) {
     const ok = await blueskySession(userId, account).then(() => true).catch((e) => !(e instanceof SocialProviderError && e.code === "platform_auth_failed"));
@@ -314,8 +341,9 @@ export async function syncAccounts(userId: string) {
 }
 
 /**
- * Stop using an account. Its posts stay in the library. The token is deleted
- * at Nango (or the stored app password deleted) so Postory can't use it again.
+ * Stop using an account. Its posts stay in the library. The connection is
+ * deleted at Zernio (or the stored app password deleted) so Postory can't use
+ * it again and it stops counting as a paid connected account.
  */
 export async function disconnectAccount(userId: string, socialAccountId: string) {
   const admin = createAdminClient();
@@ -324,9 +352,8 @@ export async function disconnectAccount(userId: string, socialAccountId: string)
 
   let providerRevoked = false;
   try {
-    if (account.provider === "nango") {
-      const t = nango.unpackAccountId(account.external_account_id);
-      await nango.deleteConnection(t.connectionId, t.providerConfigKey);
+    if (account.provider === "zernio") {
+      await zernio.disconnect(account.external_account_id);
     } else if (account.provider === "bluesky") {
       await deleteCredential(userId, account.id);
       bluesky.forgetSession(account.id);
@@ -410,8 +437,9 @@ async function sendToNetwork(userId: string, post: StoryPost, account: SocialAcc
     }
     return bluesky.publish(session, post.content, bytes);
   }
-  if (account.provider !== "nango") throw new UserFacingError("reconnect_required", "Reconnect this account to keep posting.", { label: "Connections", href: "/app/connections" });
-  return publishers.publish(platform, nango.unpackAccountId(account.external_account_id), post.content, image?.url ?? null);
+  if (account.provider !== "zernio") throw new UserFacingError("reconnect_required", "Reconnect this account to keep posting.", { label: "Connections", href: "/app/connections" });
+  // One key per attempt: a retried request lands once; a deliberate retry after a failure is a new attempt.
+  return zernio.publish({ accountId: account.external_account_id, platform, text: post.content, imageUrl: image?.url ?? null, idempotencyKey: `${post.id}:${post.publish_attempts}` });
 }
 
 async function markPublished(post: StoryPost, published: Published) {
@@ -420,7 +448,7 @@ async function markPublished(post: StoryPost, published: Published) {
     .update({
       status: "published",
       published_at: new Date().toISOString(),
-      external_post_id: published.postId,
+      external_post_id: published.providerPostId ?? published.postId,
       platform_post_id: published.postId,
       external_url: published.url && /^https?:\/\//.test(published.url) ? published.url : null,
       error_code: null,
@@ -613,12 +641,12 @@ export async function publishDueScheduledPosts(limit = 20) {
 // Engagement: metrics and comments, read back only where the network allows
 // ---------------------------------------------------------------------------
 
-type PublishedRow = { id: string; story_id: string; platform: string; platform_post_id: string; social_account_id: string };
+type PublishedRow = { id: string; story_id: string; platform: string; platform_post_id: string; external_post_id: string | null; social_account_id: string };
 
 async function recentPublished(userId: string, options: { syncedBefore?: string; platforms: Platform[]; days: number; limit: number }) {
   let query = createAdminClient()
     .from("story_posts")
-    .select("id,story_id,platform,platform_post_id,social_account_id,metrics_synced_at")
+    .select("id,story_id,platform,platform_post_id,external_post_id,social_account_id,metrics_synced_at")
     .eq("user_id", userId)
     .eq("status", "published")
     .in("platform", options.platforms)
@@ -659,10 +687,12 @@ export async function syncPostMetrics(userId: string) {
       if (!account) continue;
       let stats: Record<string, PostMetrics> = {};
       try {
-        stats =
-          account.provider === "bluesky"
-            ? await bluesky.metrics(await blueskySession(userId, account), posts.map((p) => p.platform_post_id))
-            : await publishers.metrics(account.platform as Platform, nango.unpackAccountId(account.external_account_id), posts.map((p) => p.platform_post_id));
+        if (account.provider === "bluesky") stats = await bluesky.metrics(await blueskySession(userId, account), posts.map((p) => p.platform_post_id));
+        else
+          for (const p of posts) {
+            const m = p.external_post_id ? await zernio.metrics(p.external_post_id).catch(() => null) : null;
+            if (m) stats[p.platform_post_id] = m;
+          }
       } catch (error) {
         log.warn("metrics read failed", { operation: "social.metrics", userId, provider: account.provider, platform: account.platform }, error);
       }
@@ -700,10 +730,8 @@ export async function syncInbox(userId: string) {
       if (!account) continue;
       let found: RemoteComment[] = [];
       try {
-        found =
-          account.provider === "bluesky"
-            ? await bluesky.replies(await blueskySession(userId, account), post.platform_post_id)
-            : await publishers.comments(account.platform as Platform, nango.unpackAccountId(account.external_account_id), post.platform_post_id);
+        if (account.provider === "bluesky") found = await bluesky.replies(await blueskySession(userId, account), post.platform_post_id);
+        else if (post.external_post_id) found = await zernio.comments(post.external_post_id, account.external_account_id);
       } catch (error) {
         log.warn("comments read failed", { operation: "social.inbox", userId, provider: account.provider, platform: account.platform }, error);
         continue;
@@ -753,7 +781,9 @@ export async function sendInboxReply(userId: string, itemId: string, text: strin
       if (!ctx.root || !ctx.parent) throw new UserFacingError("reply_unavailable", "Postory can't reply to this one. Reply on Bluesky instead.");
       await bluesky.publish(await blueskySession(userId, account), text, null, { root: ctx.root, parent: ctx.parent });
     } else {
-      await publishers.reply(platform, nango.unpackAccountId(account.external_account_id), item.external_id, text);
+      const ctx = item.context as { providerPostId?: string };
+      if (!ctx.providerPostId) throw new UserFacingError("reply_unavailable", "Postory can't reply to this one. Reply on the network instead.");
+      await zernio.reply({ providerPostId: ctx.providerPostId, accountId: account.external_account_id, commentId: item.external_id, text, idempotencyKey: `reply:${item.id}` });
     }
   } catch (error) {
     const outcomeUnknown = error instanceof SocialProviderError && error.options.outcomeUnknown;

@@ -17,10 +17,15 @@ export function ConnectionReturnToast() {
   useEffect(() => {
     if (!result) return;
     const name = platform && isPlatform(platform) ? PLATFORM_META[platform].name : "Account";
-    if (result === "success") toast.success(`${name} connected.`);
-    else toast.error(params.get("message") ?? `${name} wasn't connected.`);
+    const over = Number(params.get("over_limit") ?? 0);
+    if (result === "success") {
+      toast.success(`${name} connected.`);
+      if (over > 0) toast.info(`${over === 1 ? "One more account was" : `${over} more accounts were`} left out to stay within your plan.`);
+    }
+    // The reason is stored server-side and shown on the network's row; nothing from the URL is displayed.
+    else toast.error(`${name} wasn't connected. The reason is shown next to it.`);
     const next = new URLSearchParams(params);
-    ["connect", "platform", "message"].forEach((k) => next.delete(k));
+    ["connect", "platform", "over_limit"].forEach((k) => next.delete(k));
     router.replace(`${pathname}${next.size ? `?${next}` : ""}`, { scroll: false });
   }, [result, platform, params, pathname, router]);
 

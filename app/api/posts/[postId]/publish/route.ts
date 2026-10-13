@@ -19,8 +19,7 @@ const Body = z.object({
 
 /**
  * POST /api/posts/{postId}/publish — generate the post's visual with Replicate
- * (optional) and publish it straight away through the Nango proxy to the
- * network's own API.
+ * (optional) and publish it straight away (Zernio, or Bluesky directly).
  *
  * Only for a post the signed-in owner has already approved: nothing is ever
  * published without approval. Plan limits, the double-publish guard and error
@@ -51,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await createPostVisual(user.id, { ...post, stories: post.stories as { source_text: string } | null }, { orientation: body.data.orientation });
     }
 
-    // 2. Nango proxy: publish to the network now.
+    // 2. Publish to the network now.
     const published = await publishNow(user.id, post.id);
     return NextResponse.json({ ok: true, data: { status: published.status, url: published.external_url } });
   } catch (error) {

@@ -32,9 +32,9 @@ export const env = {
   supabasePublishableKey: () => read("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
   supabaseSecretKey: () => read("SUPABASE_SECRET_KEY"),
 
-  // Nango holds OAuth tokens for X, LinkedIn, Threads, Instagram, Facebook and Pinterest.
-  nangoSecretKey: () => read("NANGO_SECRET_KEY"),
-  /** 32 random bytes, base64. Encrypts secrets Nango can't hold (Bluesky app passwords). */
+  // Zernio holds the OAuth apps and tokens for X, LinkedIn, Threads, Instagram, Facebook and Pinterest.
+  zernioApiKey: () => read("ZERNIO_API_KEY"),
+  /** 32 random bytes, base64. Encrypts Bluesky app passwords. */
   credentialsKey: () => read("CREDENTIALS_KEY"),
 
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
@@ -86,7 +86,7 @@ export const env = {
 export const integrations = {
   supabase: () => Boolean(env.supabaseUrl() && env.supabasePublishableKey()),
   supabaseAdmin: () => Boolean(env.supabaseUrl() && env.supabaseSecretKey()),
-  nango: () => Boolean(env.nangoSecretKey()),
+  zernio: () => Boolean(env.zernioApiKey()),
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   replicate: () => Boolean(env.replicateApiToken()),
@@ -104,7 +104,7 @@ export function integrationStatus(): IntegrationStatus {
   return {
     supabase: integrations.supabase(),
     supabaseAdmin: integrations.supabaseAdmin(),
-    nango: integrations.nango(),
+    zernio: integrations.zernio(),
     privy: integrations.privy(),
     handypay: integrations.handypay(),
     replicate: integrations.replicate(),

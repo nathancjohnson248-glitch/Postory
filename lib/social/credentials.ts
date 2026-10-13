@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Secrets a network needs that Nango can't hold for us (a Bluesky app
+ * Secrets a network needs that Postory holds itself (a Bluesky app
  * password). Encrypted with AES-256-GCM under CREDENTIALS_KEY before they
  * reach the database, and stored in a table only the server can read.
  */

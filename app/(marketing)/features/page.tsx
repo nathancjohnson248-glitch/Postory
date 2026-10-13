@@ -19,7 +19,7 @@ const FEATURES = [
   { icon: ShieldCheck, title: "Facts stay facts", body: "Postory only uses your story and business memory. Numbers are kept exactly; anything it can't trace back to you is flagged before you approve." },
   { icon: Inbox, title: "Inbox", body: "A short list of conversations worth answering, with drafted replies you approve. On Pro and Max, where your networks make it available." },
   { icon: LineChart, title: "Analytics", body: "What went out, where, and which stories travelled furthest — in sentences first. Only real numbers; nothing estimated." },
-  { icon: Plug, title: "Real connections", body: "Accounts connect through each network's own consent screen. Postory never sees your passwords, and tokens are held by Nango, a dedicated OAuth service." },
+  { icon: Plug, title: "Real connections", body: "Accounts connect through each network's own consent screen. Postory never sees your passwords, and tokens are held by Zernio, a dedicated social connection service." },
 ];
 
 export default function FeaturesPage() {

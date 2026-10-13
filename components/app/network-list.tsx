@@ -2,7 +2,7 @@
 
 import { showError } from "@/lib/client/show-error";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { AlertCircle, Check, Link2, RefreshCw, Unplug } from "lucide-react";
@@ -13,7 +13,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Dialog } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/notice";
-import { connectBlueskyAccount, connectNetwork, disconnectNetwork, finishConnection, syncNetworks } from "@/app/_actions/social";
+import { connectBlueskyAccount, connectNetwork, disconnectNetwork, syncNetworks } from "@/app/_actions/social";
 import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ export function NetworkList({
   availability?: Availability;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [connecting, setConnecting] = useState<Platform | null>(null);
   const [rowErrors, setRowErrors] = useState<Partial<Record<Platform, string>>>({});
   const [bluesky, setBluesky] = useState<{ attemptId: string } | null>(null);
@@ -44,7 +45,7 @@ export function NetworkList({
   async function connect(platform: Platform) {
     setConnecting(platform);
     setRowErrors((e) => ({ ...e, [platform]: undefined }));
-    const result = await connectNetwork(platform);
+    const result = await connectNetwork(platform, pathname.startsWith("/onboarding") ? "onboarding" : "connections");
     if (!result.ok) {
       setConnecting(null);
       setRowErrors((e) => ({ ...e, [platform]: result.error.message }));
@@ -55,31 +56,8 @@ export function NetworkList({
       setBluesky({ attemptId: result.data.attemptId });
       return;
     }
-    // Nango's Connect UI opens over the page; the network's consent screen runs inside it.
-    const attemptId = result.data.attemptId;
-    const { default: Nango } = await import("@nangohq/frontend");
-    let finished = false;
-    new Nango().openConnectUI({
-      sessionToken: result.data.token,
-      onEvent: async (event) => {
-        if (event.type === "connect" && !finished) {
-          finished = true;
-          const done = await finishConnection(attemptId);
-          setConnecting(null);
-          if (!done.ok) {
-            setRowErrors((e) => ({ ...e, [platform]: done.error.message }));
-            return;
-          }
-          toast.success(done.data.connected === 1 ? `${PLATFORM_META[platform].name} connected.` : `${done.data.connected} accounts connected.`);
-          router.refresh();
-        } else if (event.type === "close" && !finished) {
-          setConnecting(null);
-        } else if (event.type === "error") {
-          setConnecting(null);
-          setRowErrors((e) => ({ ...e, [platform]: event.payload.errorMessage || "The connection didn't finish. Try again." }));
-        }
-      },
-    });
+    // The network's own sign-in page; it sends the browser back to /api/social/callback.
+    window.location.assign(result.data.url);
   }
 
   async function disconnect(accountId: string, platform: Platform) {

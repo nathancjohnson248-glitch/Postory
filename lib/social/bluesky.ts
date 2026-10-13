@@ -1,8 +1,8 @@
 import "server-only";
 
 /**
- * Bluesky over the AT Protocol (https://docs.bsky.app). Nango doesn't support
- * Bluesky, so accounts connect with an app password (Settings → Privacy and
+ * Bluesky over the AT Protocol (https://docs.bsky.app), directly rather than
+ * through Zernio, so it never costs a connected account. Accounts connect with an app password (Settings → Privacy and
  * security → App passwords on Bluesky), which can post but can't change the
  * account or read DMs, and can be revoked there at any time.
  *

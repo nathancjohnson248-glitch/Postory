@@ -2,8 +2,8 @@ import type { Platform } from "./platforms";
 
 /** Shapes the rest of Postory works with, whichever way an account is connected. */
 
-/** "nango" for OAuth connections held by Nango; "bluesky" for app-password connections. */
-export type ConnectionKind = "nango" | "bluesky";
+/** "zernio" for OAuth connections held by Zernio; "bluesky" for app-password connections. */
+export type ConnectionKind = "zernio" | "bluesky";
 
 export type ProviderAccount = {
   externalId: string;
@@ -15,7 +15,8 @@ export type ProviderAccount = {
   metadata: Record<string, unknown>;
 };
 
-export type Published = { postId: string; url: string | null };
+/** providerPostId: the connection service's own id for the post, used to read metrics and comments. */
+export type Published = { postId: string; url: string | null; providerPostId?: string };
 
 /** Engagement on one published post. null = the network doesn't report that number. */
 export type PostMetrics = { impressions: number | null; reach: number | null; reactions: number | null; comments: number | null; reposts: number | null };

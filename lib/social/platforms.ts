@@ -21,8 +21,8 @@ export type PlatformMeta = {
   voice: string;
   /** Extra caveat the UI should surface. */
   note?: string;
-  /** How an account is connected: Nango OAuth, a Bluesky app password, or not at all. */
-  connect: "nango" | "app_password" | "none";
+  /** How an account is connected: OAuth through Zernio, a Bluesky app password, or not at all. */
+  connect: "oauth" | "app_password" | "none";
   /** What Postory can do with a connected account, per the network's API. */
   can: { publish: boolean; metrics: boolean; comments: boolean };
   /** Plain-language reason for anything above that's off. */
@@ -36,9 +36,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 280,
     mediaRequired: "none",
     voice: "Punchy and compressed. Lead with the most striking concrete detail. Lowercase is fine if it fits the brand. No hashtag stuffing; at most one if any.",
-    connect: "nango",
+    connect: "oauth",
     can: { publish: true, metrics: true, comments: false },
-    limitation: "X charges apps to read replies, so X comments don't come into the inbox.",
+    limitation: "X charges for every reply read, so X comments stay on X for now.",
   },
   linkedin: {
     id: "linkedin",
@@ -46,9 +46,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 3000,
     mediaRequired: "none",
     voice: "First-person, reflective, professional without corporate filler. Short paragraphs with line breaks. Explain why it matters. A closing line that invites conversation is fine.",
-    connect: "nango",
-    can: { publish: true, metrics: false, comments: false },
-    limitation: "LinkedIn only shares post stats and comments with its approved partner apps, so Postory can publish but not read them back.",
+    connect: "oauth",
+    can: { publish: true, metrics: true, comments: true },
+    limitation: "On personal profiles, LinkedIn shares stats only for posts published through Postory.",
   },
   instagram: {
     id: "instagram",
@@ -57,7 +57,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     mediaRequired: "image_or_video",
     voice: "Visual-first caption. A bold opening line, then a few short lines. Energetic but genuine. A few relevant hashtags at the end are acceptable.",
     note: "Instagram requires an image or video.",
-    connect: "nango",
+    connect: "oauth",
     can: { publish: true, metrics: true, comments: true },
   },
   threads: {
@@ -66,7 +66,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 500,
     mediaRequired: "none",
     voice: "Conversational and casual, like talking to people who already follow you. Short.",
-    connect: "nango",
+    connect: "oauth",
     can: { publish: true, metrics: true, comments: true },
   },
   facebook: {
@@ -75,7 +75,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 63206,
     mediaRequired: "none",
     voice: "Warm, community-oriented, plain language. A couple of short paragraphs.",
-    connect: "nango",
+    connect: "oauth",
     can: { publish: true, metrics: true, comments: true },
   },
   bluesky: {
@@ -94,7 +94,7 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     mediaRequired: "image_or_video",
     voice: "Descriptive and searchable. Say what the image shows and why someone would save it.",
     note: "Every pin needs exactly one image or video.",
-    connect: "nango",
+    connect: "oauth",
     can: { publish: true, metrics: true, comments: false },
     limitation: "Pinterest has no API for comments.",
   },

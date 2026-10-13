@@ -1,7 +1,7 @@
 /**
  * Runs once when the Node server starts. Postory's own scheduler: every minute,
- * send scheduled posts whose time has come (only used when the social provider
- * publishes but doesn't schedule, i.e. Nango). Each post is claimed in the
+ * send scheduled posts whose time has come, re-checking the plan and the
+ * account at send time. Each post is claimed in the
  * database before sending, so overlapping ticks or instances can't double-post.
  */
 export async function register() {

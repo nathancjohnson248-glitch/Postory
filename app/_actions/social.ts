@@ -12,21 +12,15 @@ function refresh() {
   revalidatePath("/app", "layout");
 }
 
-/** Start connecting: a Nango Connect UI token, or a request for Bluesky credentials. */
-export async function connectNetwork(platform: string) {
+/**
+ * Start connecting: a link to the network's consent screen (the browser comes
+ * back to /api/social/callback), or a request for Bluesky credentials.
+ */
+export async function connectNetwork(platform: string, from: "connections" | "onboarding" = "connections") {
   return runAction("social.connect", async (user) => {
     const parsed = platformSchema.safeParse(platform);
     if (!parsed.success) throw new UserFacingError("invalid_platform", "Unknown network.");
-    return social.startConnection(user.id, parsed.data);
-  });
-}
-
-/** Nango's Connect UI finished: ask Nango what's now connected. */
-export async function finishConnection(attemptId: string) {
-  return runAction("social.finish", async (user) => {
-    const accounts = await social.completeConnection(user.id, idSchema.parse(attemptId));
-    refresh();
-    return { connected: accounts.length };
+    return social.startConnection(user.id, parsed.data, from === "onboarding" ? "onboarding" : "connections");
   });
 }
 
