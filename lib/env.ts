@@ -41,7 +41,7 @@ export const env = {
   handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
   // All text goes to one OpenAI-compatible chat completions API (Groq, OpenAI,
-  // DeepSeek, Together, Azure AI Foundry, OpenRouter, SambaNova...). Switch
+  // DeepSeek, Together, Azure AI Foundry, OpenRouter, Plugsky...). Switch
   // providers by changing these three; no code change needed.
   aiTextBaseUrl: () => read("AI_TEXT_BASE_URL")?.replace(/\/+$/, ""),
   aiTextApiKey: () => read("AI_TEXT_API_KEY"),
