@@ -40,6 +40,10 @@ export const env = {
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
   handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
+  // SambaNova Cloud writes first (OpenAI-compatible chat API); Replicate is the fallback and makes images.
+  sambanovaApiKey: () => read("SAMBANOVA_API_KEY"),
+  sambanovaModel: () => read("SAMBANOVA_MODEL") ?? "DeepSeek-V3.1",
+  sambanovaFastModel: () => read("SAMBANOVA_FAST_MODEL") ?? "Meta-Llama-3.3-70B-Instruct",
   replicateApiToken: () => read("REPLICATE_API_TOKEN"),
   // Replicate runs all of Postory's AI. Text models take prompt + system_prompt; see lib/ai/llm.ts.
   replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "anthropic/claude-4.5-sonnet",
@@ -78,6 +82,7 @@ export const integrations = {
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   replicate: () => Boolean(env.replicateApiToken()),
+  sambanova: () => Boolean(env.sambanovaApiKey()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
   zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
   /** Postory can send email from its own address (Zoho or SMTP). */
@@ -94,6 +99,7 @@ export function integrationStatus(): IntegrationStatus {
     privy: integrations.privy(),
     handypay: integrations.handypay(),
     replicate: integrations.replicate(),
+    sambanova: integrations.sambanova(),
     smtp: integrations.smtp(),
     zoho: integrations.zoho(),
     email: integrations.email(),

@@ -7,17 +7,16 @@ import { sendEmail } from "@/lib/email/send";
 import { log } from "@/lib/log";
 
 /**
- * Postory's one door to its models. Everything runs on Replicate with one
- * server-side token (REPLICATE_API_TOKEN):
+ * Postory's one door to its models, all server-side:
  *
- *   text   REPLICATE_TEXT_MODEL   (default anthropic/claude-4.5-sonnet)
- *          REPLICATE_FAST_MODEL   (default anthropic/claude-4.5-haiku), quick checks
- *   images REPLICATE_IMAGE_MODEL  (default black-forest-labs/flux-1.1-pro)
+ *   text   SambaNova (SAMBANOVA_MODEL / SAMBANOVA_FAST_MODEL) first, then
+ *          Replicate (REPLICATE_TEXT_MODEL / REPLICATE_FAST_MODEL) if SambaNova
+ *          is busy or refuses
+ *   images Replicate (REPLICATE_IMAGE_MODEL, default FLUX 1.1 Pro)
  *
- * Replicate's language models take a plain prompt and system prompt, so every
- * call puts the JSON Schema in the instructions, extracts the object from the
- * answer, and validates it with zod. A malformed answer is retried once; model
- * output is never trusted as-is, and callers validate again with their limits.
+ * Every call puts the JSON Schema in the instructions, extracts the object
+ * from the answer, and validates it with zod. A malformed answer is retried
+ * once; model output is never trusted as-is, and callers validate again.
  */
 
 export class LlmError extends Error {
@@ -32,8 +31,8 @@ export class LlmError extends Error {
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
-export function llmProvider(): "replicate" | null {
-  return integrations.replicate() ? "replicate" : null;
+export function llmProvider(): "sambanova" | "replicate" | null {
+  return integrations.sambanova() ? "sambanova" : integrations.replicate() ? "replicate" : null;
 }
 
 export function imageAvailable() {
@@ -156,37 +155,112 @@ function extractObject(output: unknown): unknown {
   }
 }
 
+// --- SambaNova (text) ---------------------------------------------------------
+
+/** Providers that refused Postory's account recently (no access, no credit), and until when to skip them. */
+const benched = new Map<string, number>();
+
 /**
- * One structured call: a system prompt, the conversation (or a single user
- * message), and the schema the answer must follow. Returns the parsed object
- * (callers still apply their own validated schema with length limits).
+ * SambaNova Cloud's OpenAI-compatible chat API (https://docs.sambanova.ai).
+ * JSON mode keeps the answer parseable; the schema itself goes in the system
+ * prompt, and the result is validated like every other provider's.
  */
-export async function generateStructured<S extends z.ZodType>(input: StructuredInput<S>): Promise<z.infer<S>> {
-  if (!integrations.replicate()) throw new LlmError("unavailable", "Postory's AI isn't set up on this deployment yet.");
+async function sambanova(model: string, system: string, turns: ChatTurn[], maxTokens: number): Promise<string> {
+  const key = env.sambanovaApiKey();
+  if (!key) throw new ConfigurationError("SAMBANOVA_API_KEY");
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch("https://api.sambanova.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: system }, ...turns.map((t) => ({ role: t.role, content: t.content }))],
+          max_tokens: maxTokens,
+          temperature: 0.5,
+          response_format: { type: "json_object" },
+        }),
+        signal: AbortSignal.timeout(120_000),
+        cache: "no-store",
+      });
+    } catch (error) {
+      log.warn("sambanova request failed", { operation: "ai.sambanova", provider: "sambanova", model }, error);
+      throw new LlmError("provider_error", "Postory's AI didn't respond. Nothing was lost, so try again.");
+    }
+    const data = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string } }[]; error?: { message?: string } };
+    if (res.ok) return data.choices?.[0]?.message?.content ?? "";
+    log.warn("sambanova error response", { operation: "ai.sambanova", provider: "sambanova", model, status: res.status });
+    // Rate limits are short: wait out one, then let the next provider take it.
+    if (res.status === 429 && attempt === 0) {
+      const wait = Math.min(Number(res.headers.get("retry-after")) || 3, 8);
+      await new Promise((r) => setTimeout(r, wait * 1000));
+      continue;
+    }
+    if (res.status === 401 || res.status === 402 || res.status === 403 || res.status === 404) throw new LlmError("unavailable", "Postory's AI couldn't respond just now. Anything you wrote is saved, so try again in a few minutes.");
+    throw new LlmError("provider_error", "Postory's AI is busy. Nothing was lost, so try again in a minute.");
+  }
+}
+
+function withSchema(system: string, schema: z.ZodType) {
+  return `${system}\n\nRespond with only one JSON object that matches this JSON Schema. No prose, no code fences.\n${JSON.stringify(jsonSchemaFor(schema))}`;
+}
+
+type TextProvider = "sambanova" | "replicate";
+
+function textProviders(): TextProvider[] {
+  const all: TextProvider[] = [];
+  if (integrations.sambanova()) all.push("sambanova");
+  if (integrations.replicate()) all.push("replicate");
+  const ready = all.filter((p) => (benched.get(p) ?? 0) < Date.now());
+  return ready.length ? ready : all;
+}
+
+async function askOnce(provider: TextProvider, input: StructuredInput<z.ZodType>): Promise<unknown> {
+  const system = withSchema(input.system, input.schema);
+  if (provider === "sambanova") {
+    const model = input.tier === "fast" ? env.sambanovaFastModel() : env.sambanovaModel();
+    return extractObject(await sambanova(model, system, input.turns, input.tier === "fast" ? 2048 : 6000));
+  }
   const model = input.tier === "fast" ? env.replicateFastModel() : env.replicateTextModel();
   const prompt =
     input.turns.length === 1 ? input.turns[0].content : input.turns.map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`).join("\n\n");
-  const body = {
-    system_prompt: `${input.system}\n\nRespond with only one JSON object that matches this JSON Schema. No prose, no code fences.\n${JSON.stringify(jsonSchemaFor(input.schema))}`,
-    prompt,
-    max_tokens: input.tier === "fast" ? 2048 : 6000,
-  };
+  return extractObject(await predict(model, { system_prompt: system, prompt, max_tokens: input.tier === "fast" ? 2048 : 6000 }, 150_000, "text"));
+}
+
+/**
+ * One structured call: a system prompt, the conversation (or a single user
+ * message), and the schema the answer must follow. SambaNova answers first;
+ * Replicate takes over if SambaNova is busy or refuses. A malformed answer is
+ * retried once. Returns the parsed object (callers still apply their own
+ * validated schema with length limits).
+ */
+export async function generateStructured<S extends z.ZodType>(input: StructuredInput<S>): Promise<z.infer<S>> {
+  const providers = textProviders();
+  if (!providers.length) throw new LlmError("unavailable", "Postory's AI isn't set up on this deployment yet.");
 
   let lastError: unknown = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const parsed = extractObject(await predict(model, body, 150_000, "text"));
-      const result = input.schema.safeParse(parsed);
-      if (!result.success) throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
-      return result.data;
-    } catch (error) {
-      lastError = error;
-      // A malformed answer is worth one more try; anything else goes back to the caller.
-      if (!(error instanceof LlmError && error.code === "invalid_output")) throw error;
-      log.warn("model output rejected, retrying", { operation: `ai.${input.name}`, provider: "replicate", model, attempt });
+  for (const provider of providers) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = input.schema.safeParse(await askOnce(provider, input));
+        if (!result.success) throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
+        benched.delete(provider);
+        return result.data;
+      } catch (error) {
+        lastError = error;
+        if (error instanceof LlmError && error.code === "invalid_output" && attempt === 0) {
+          log.warn("model output rejected, retrying", { operation: `ai.${input.name}`, provider, attempt });
+          continue;
+        }
+        if (error instanceof LlmError && error.code === "unavailable") benched.set(provider, Date.now() + 10 * 60_000);
+        // Busy, refused or still malformed: hand over to the next provider.
+        if (error instanceof LlmError || error instanceof ConfigurationError) break;
+        throw error;
+      }
     }
   }
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new LlmError("provider_error", "Postory's AI hit a problem. Try again.");
 }
 
 // --- Images ---------------------------------------------------------------------
