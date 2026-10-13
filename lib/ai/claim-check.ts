@@ -4,6 +4,7 @@ import { z } from "zod";
 import { log } from "@/lib/log";
 import { PLATFORM_META, countCharacters, type Platform } from "@/lib/social/platforms";
 import { findUnsupportedNumbers } from "./factuality";
+import { CLICHE_LIST } from "./voice-lint";
 import { generateStructured } from "./llm";
 
 /**
@@ -16,9 +17,11 @@ import { generateStructured } from "./llm";
  * own checks, the original drafts are kept (they still go to review, never out).
  */
 
-const CHECK_SYSTEM = `You are a strict fact checker for social posts a business owner will review.
+const CHECK_SYSTEM = `You are a strict fact and voice checker for social posts a business owner will review.
 
 You get FACTS (the only things known to be true) and POSTS. For each post, find phrases that state something specific that FACTS don't support: features, product details, changes, events, reactions ("early buzz"), results, rewards, causes ("the fix drove growth"), quotes, effort ("worked through the night"), people or plans.
+
+Also flag stock phrases that make a post sound AI-written (${CLICHE_LIST}, and more than one em dash) and, in the revision, replace each with plain words that keep the meaning.
 
 Do NOT flag: feelings and opinions ("feels good"), general statements about why something matters, invitations and questions ("give it a try", "what do you think?"), the business's own description, or hashtags.
 

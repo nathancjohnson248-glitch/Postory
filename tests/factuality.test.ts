@@ -38,3 +38,19 @@ describe("checkGeneration", () => {
     expect(result.missingPlatforms).toEqual(["linkedin"]);
   });
 });
+
+import { enforcePreferences, findCliches } from "@/lib/ai/voice-lint";
+
+describe("voice lint", () => {
+  it("flags stock AI phrasing and em-dash habits", () => {
+    expect(findCliches("We're thrilled to announce our game-changing app — it's here — finally")).toEqual(
+      expect.arrayContaining(["excited to announce", "game-changer", "2 em dashes"]),
+    );
+    expect(findCliches("shipped the ios app today. 37 downloads in the first hour.")).toEqual([]);
+  });
+
+  it("removes hashtags and emoji when the owner said never", () => {
+    expect(enforcePreferences("37 downloads 📱\nStill early.\n#indieapp #habittracker", { emoji: "never", hashtags: "never" })).toBe("37 downloads\nStill early.");
+    expect(enforcePreferences("We're #1 on our list 🎉", { emoji: "voice", hashtags: "platform" })).toBe("We're #1 on our list 🎉");
+  });
+});

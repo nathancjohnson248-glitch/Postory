@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { CalendarClock, ChevronLeft, ChevronRight, ExternalLink, GripVertical } from "lucide-react";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { PostPreview } from "@/components/product/post-preview";
+import { AccountAvatar } from "@/components/brand/account-avatar";
 import { PostStatusBadge } from "@/components/product/status-badge";
 import { ScheduleDialog } from "@/components/app/story/schedule-dialog";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -263,7 +264,15 @@ export function CalendarBoard({
               </span>
             </div>
             <div className="rounded-2xl bg-paper p-4 ring-1 ring-line">
-              <PostPreview platform={open.platform} content={open.content} authorName={businessName} handle={open.account?.name} media={open.media.map((m) => ({ kind: m.kind, url: m.url }))} clamp={10} />
+              <PostPreview
+                platform={open.platform}
+                content={open.content}
+                authorName={open.account?.displayName ?? businessName}
+                handle={open.account?.handle ?? open.account?.name}
+                avatar={open.account ? <AccountAvatar src={open.account.avatarUrl} name={open.account.displayName ?? open.account.name} platform={open.platform} className="size-8" /> : undefined}
+                media={open.media.map((m) => ({ kind: m.kind, url: m.url }))}
+                clamp={10}
+              />
             </div>
             {open.status === "failed" && open.errorMessage ? <p className="text-[13px] text-danger">{open.errorMessage}</p> : null}
             <div className="flex flex-wrap justify-end gap-2">
@@ -354,7 +363,11 @@ function Agenda({ byDay, timezone, onOpen }: { byDay: Map<string, PostView[]>; t
               <li key={p.id}>
                 <button type="button" onClick={() => onOpen(p)} className="flex w-full items-center gap-3.5 rounded-2xl px-3 py-3 text-left transition-colors hover:bg-wash">
                   <span className="w-16 shrink-0 text-[13px] font-medium tabular-nums text-ink-soft">{formatTime(postInstant(p)!, timezone)}</span>
-                  <PlatformIcon platform={p.platform} tile className="size-8 rounded-[10px]" />
+                  {p.account ? (
+                    <AccountAvatar src={p.account.avatarUrl} name={p.account.displayName ?? p.account.name} platform={p.platform} className="size-8" />
+                  ) : (
+                    <PlatformIcon platform={p.platform} tile className="size-8 rounded-[10px]" />
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold">{p.storyTitle}</span>
                     <span className="block truncate text-[13px] text-muted">{p.content.replace(/\s+/g, " ")}</span>

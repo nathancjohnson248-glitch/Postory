@@ -24,11 +24,12 @@ import { formatInZone, safeTimeZone } from "@/lib/time";
 import { idSchema } from "@/lib/validation/schemas";
 import { PLATFORM_META, isPlatform, type Platform } from "@/lib/social/platforms";
 import { Suspense } from "react";
+import { StoryReadCard, type StoryRead } from "@/components/app/story/story-read";
 
 export const metadata: Metadata = { title: "Story" };
 export const maxDuration = 60;
 
-type Analysis = { facts?: string[]; angles?: string[]; missingInformation?: string[]; schedulingSuggestion?: string | null };
+type Analysis = StoryRead & { facts?: string[]; angles?: string[]; missingInformation?: string[]; schedulingSuggestion?: string | null };
 
 export default async function StoryPage({ params, searchParams }: { params: Promise<{ storyId: string }>; searchParams: Promise<{ missing?: string }> }) {
   const { storyId } = await params;
@@ -43,7 +44,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
     getEntitlements(user.id),
     getSocialReadiness(),
     loadBusinessContext(user.id),
-    supabase.from("social_accounts").select("id,platform,username,display_name").eq("user_id", user.id).eq("status", "connected"),
+    supabase.from("social_accounts").select("id,platform,username,display_name,profile_image_url").eq("user_id", user.id).eq("status", "connected"),
   ]);
   if (!data) notFound();
   const { story, posts } = data;
@@ -110,6 +111,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
           ) : null}
         </blockquote>
         <div className="flex flex-col gap-4">
+          <StoryReadCard read={analysis} />
           {analysis.angles?.length ? (
             <div className="rounded-3xl bg-surface p-5 shadow-soft ring-1 ring-line">
               <p className="text-[13px] font-semibold">Angles</p>
@@ -161,7 +163,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
                 businessName: profile.business_name ?? profile.name ?? "Your business",
                 accounts: (accounts ?? [])
                   .filter((a) => a.platform === post.platform)
-                  .map((a) => ({ id: a.id, name: a.username ?? a.display_name ?? "Account" })),
+                  .map((a) => ({ id: a.id, name: a.username ?? a.display_name ?? "Account", displayName: a.display_name, avatarUrl: a.profile_image_url })),
                 canPublish,
                 aiEnabled: aiAvailable() && entitlements.active,
                 factWarnings: (() => {

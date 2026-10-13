@@ -18,9 +18,22 @@ export const ModelGeneratedPost = z.object({
   mediaSuggestion: z.string().nullable(),
 });
 
+const FIT = z.enum(["strong", "good", "weak"]);
+const MEDIA_KIND = z.enum(["none", "real_screenshot", "real_photo", "generated_visual", "video"]);
+
 export const ModelGeneration = z.object({
   // First, so the model commits to the facts before it writes anything.
   facts: z.array(z.string()),
+  // Then its read of the story, before any writing.
+  eventType: z.string(),
+  significance: z.string(),
+  strongestAngle: z.string(),
+  strongestAngleWhy: z.string(),
+  networkFit: z.array(z.object({ platform: z.enum(PLATFORMS), fit: FIT, why: z.string() })),
+  media: z.object({ kind: MEDIA_KIND, why: z.string() }),
+  repetition: z.string().nullable(),
+  followUps: z.array(z.string()),
+  seriesIdea: z.string().nullable(),
   storyTitle: z.string(),
   summary: z.string(),
   angles: z.array(z.string()),
@@ -32,6 +45,15 @@ export const ModelGeneration = z.object({
 
 export const ValidatedGeneration = z.object({
   facts: z.array(z.string().trim().min(1).max(300)).max(24).default([]),
+  eventType: z.string().trim().max(60).catch(""),
+  significance: z.string().trim().max(400).catch(""),
+  strongestAngle: z.string().trim().max(240).catch(""),
+  strongestAngleWhy: z.string().trim().max(400).catch(""),
+  networkFit: z.array(z.object({ platform: z.enum(PLATFORMS), fit: FIT, why: z.string().trim().max(240) })).max(PLATFORMS.length).catch([]),
+  media: z.object({ kind: MEDIA_KIND, why: z.string().trim().max(300) }).nullable().catch(null),
+  repetition: z.string().trim().max(400).nullable().catch(null),
+  followUps: z.array(z.string().trim().min(1).max(400)).max(4).catch([]),
+  seriesIdea: z.string().trim().max(500).nullable().catch(null),
   storyTitle: z.string().trim().min(1).max(120),
   summary: z.string().trim().max(600),
   angles: z.array(z.string().trim().min(1).max(240)).max(6),

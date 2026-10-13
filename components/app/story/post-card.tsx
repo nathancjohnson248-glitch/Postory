@@ -21,6 +21,7 @@ import {
 import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { CharacterCount, PostPreview } from "@/components/product/post-preview";
+import { AccountAvatar } from "@/components/brand/account-avatar";
 import { PostStatusBadge } from "@/components/product/status-badge";
 import { Button, Spinner } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -52,7 +53,7 @@ export type PostCardContext = {
   userId: string;
   timezone: string;
   businessName: string;
-  accounts: { id: string; name: string }[];
+  accounts: { id: string; name: string; displayName?: string | null; avatarUrl?: string | null }[];
   canPublish: { ok: true } | { ok: false; reason: string; href?: string };
   aiEnabled: boolean;
   factWarnings: string[];
@@ -253,8 +254,18 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
               <PostPreview
                 platform={post.platform}
                 content={post.content}
-                authorName={ctx.businessName}
+                authorName={post.account?.displayName ?? ctx.accounts.find((a) => a.id === post.account?.id)?.displayName ?? ctx.businessName}
                 handle={accountName}
+                avatar={
+                  post.account || ctx.accounts[0] ? (
+                    <AccountAvatar
+                      src={post.account?.avatarUrl ?? ctx.accounts[0]?.avatarUrl}
+                      name={post.account?.displayName ?? post.account?.name ?? ctx.accounts[0]?.name}
+                      platform={post.platform}
+                      className="size-8"
+                    />
+                  ) : undefined
+                }
                 media={post.media.map((m) => ({ kind: m.kind, url: m.url, alt: m.altText }))}
                 meta={
                   <>

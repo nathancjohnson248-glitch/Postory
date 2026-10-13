@@ -3,7 +3,7 @@ import { z } from "zod";
 import { toFailure } from "@/app/_actions/_run";
 import type { ActionError } from "@/lib/errors";
 import { aiAvailable } from "@/lib/ai/client";
-import { factCorpus, loadBusinessContext } from "@/lib/ai/context";
+import { factCorpus, loadBusinessContext, loadRecentContent } from "@/lib/ai/context";
 import { generatePosts } from "@/lib/ai/generate-posts";
 import { getSessionUser } from "@/lib/auth/session";
 import { consumePreviewGeneration, consumeUsage, getEntitlements } from "@/lib/entitlements";
@@ -115,7 +115,17 @@ export async function POST(request: NextRequest) {
 
         // 3. Write.
         send({ type: "stage", stage: "writing" });
-        const result = await generatePosts({ story: sourceText, platforms, context, corpus: factCorpus(context, sourceText), askWhenThin: true });
+        const recent = await loadRecentContent(user.id, storyId).catch(() => "");
+        const result = await generatePosts({
+          story: sourceText,
+          platforms,
+          context,
+          corpus: factCorpus(context, sourceText),
+          askWhenThin: true,
+          recent,
+          // Sent when the independent fact and voice check actually starts.
+          onChecking: () => send({ type: "stage", stage: "checking" }),
+        });
 
         // Too vague to write without guessing: ask instead, and don't charge for it.
         if (result.needsMoreDetail) {
@@ -127,9 +137,6 @@ export async function POST(request: NextRequest) {
           send({ type: "needs_detail", questions: result.missingInformation });
           return;
         }
-
-        // 4. Check (validation + fact check already ran in generatePosts; this marks the step).
-        send({ type: "stage", stage: "checking" });
 
         // 5. Save posts, each pointed at the user's connected account for that network.
         send({ type: "stage", stage: "saving" });
@@ -168,6 +175,15 @@ export async function POST(request: NextRequest) {
               angles: result.angles,
               missingInformation: result.missingInformation,
               schedulingSuggestion: result.schedulingSuggestion,
+              eventType: result.eventType,
+              significance: result.significance,
+              strongestAngle: result.strongestAngle,
+              strongestAngleWhy: result.strongestAngleWhy,
+              networkFit: result.networkFit,
+              media: result.media,
+              repetition: result.repetition,
+              followUps: result.followUps,
+              seriesIdea: result.seriesIdea,
             },
           })
           .eq("id", storyId)

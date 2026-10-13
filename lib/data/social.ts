@@ -5,7 +5,7 @@ import { PLATFORMS, type Platform } from "@/lib/social/platforms";
 
 export type NetworkState = {
   platform: Platform;
-  accounts: { id: string; displayName: string | null; username: string | null; status: string; connectedAt: string }[];
+  accounts: { id: string; displayName: string | null; username: string | null; avatarUrl: string | null; status: string; connectedAt: string }[];
   lastError: string | null;
 };
 
@@ -15,7 +15,7 @@ export async function getNetworkStates(userId: string): Promise<NetworkState[]> 
   const [{ data: accounts }, { data: attempts }] = await Promise.all([
     supabase
       .from("social_accounts")
-      .select("id,platform,display_name,username,status,connected_at")
+      .select("id,platform,display_name,username,status,connected_at,profile_image_url")
       .eq("user_id", userId)
       .neq("status", "disconnected")
       .order("connected_at"),
@@ -38,6 +38,7 @@ export async function getNetworkStates(userId: string): Promise<NetworkState[]> 
         id: a.id,
         displayName: a.display_name,
         username: a.username,
+        avatarUrl: a.profile_image_url,
         status: a.status,
         connectedAt: a.connected_at,
       })),

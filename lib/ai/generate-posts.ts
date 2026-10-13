@@ -4,6 +4,7 @@ import { PLATFORM_META, countCharacters, type Platform } from "@/lib/social/plat
 import { generateStructured, LlmError } from "./llm";
 import { removeUnsupportedClaims } from "./claim-check";
 import { findUnsupportedNumbers } from "./factuality";
+import { enforcePreferences, findCliches } from "./voice-lint";
 import { GENERATE_SYSTEM, generateUserPrompt, type BusinessContext } from "./prompts";
 import { ModelGeneration, ValidatedGeneration, type GenerationResult } from "./types";
 
@@ -41,6 +42,8 @@ export function checkGeneration(raw: unknown, platforms: Platform[], corpus: str
     const length = countCharacters(post.content);
     const limit = PLATFORM_META[post.platform].charLimit;
     if (length > limit) warnings.push(`${length - limit} characters over the ${PLATFORM_META[post.platform].name} limit.`);
+    const cliches = findCliches(post.content);
+    if (cliches.length) warnings.push(`Reads a bit generic: ${cliches.join(", ")}.`);
     posts.push({ ...post, warnings });
   }
   if (posts.length === 0) throw new LlmError("invalid_output", "The writer didn't produce posts for the networks you chose. Try again.");
@@ -53,20 +56,25 @@ export function checkGeneration(raw: unknown, platforms: Platform[], corpus: str
  * `needsMoreDetail` with questions instead of posts (new stories). Otherwise
  * that case is an error (rewrites of a story that already has posts).
  */
-export async function generatePosts(input: { story: string; platforms: Platform[]; context: BusinessContext; corpus: string; angle?: string; askWhenThin?: boolean }) {
+export async function generatePosts(input: { story: string; platforms: Platform[]; context: BusinessContext; corpus: string; angle?: string; askWhenThin?: boolean; recent?: string; onChecking?: () => void }) {
   const raw = await generateStructured({
     system: GENERATE_SYSTEM,
-    turns: [{ role: "user", content: generateUserPrompt(input) }],
+    turns: [{ role: "user", content: generateUserPrompt({ story: input.story, platforms: input.platforms, context: input.context, angle: input.angle, recent: input.recent }) }],
     schema: ModelGeneration,
     name: "story_posts",
   });
   const result = checkGeneration(raw, input.platforms, input.corpus, input.askWhenThin);
   if (result.needsMoreDetail || !result.posts.length) return result;
-  // Second, independent read: strip specific claims the facts don't support.
+  // Second, independent read: strip specific claims the facts don't support, and stock AI phrasing.
+  input.onChecking?.();
   const checked = await removeUnsupportedClaims(result.posts, result.facts, input.corpus);
   return {
     ...result,
-    posts: checked.map((post) => (post.content === result.posts.find((p) => p.platform === post.platform)?.content ? post : withWarnings(post, input.corpus))),
+    posts: checked.map((post) => {
+      const content = enforcePreferences(post.content, input.context.preferences);
+      const final = content === post.content ? post : { ...post, content };
+      return final.content === result.posts.find((p) => p.platform === post.platform)?.content ? final : withWarnings(final, input.corpus);
+    }),
   };
 }
 
@@ -78,5 +86,7 @@ function withWarnings(post: GeneratedPostWithChecks, corpus: string): GeneratedP
   const length = countCharacters(post.content);
   const limit = PLATFORM_META[post.platform].charLimit;
   if (length > limit) warnings.push(`${length - limit} characters over the ${PLATFORM_META[post.platform].name} limit.`);
+  const cliches = findCliches(post.content);
+  if (cliches.length) warnings.push(`Reads a bit generic: ${cliches.join(", ")}.`);
   return { ...post, warnings };
 }

@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [{ data: accounts }, { count: reviewCount }] = await Promise.all([
     supabase
       .from("social_accounts")
-      .select("id,platform,display_name,username,status")
+      .select("id,platform,display_name,username,status,profile_image_url")
       .eq("user_id", user.id)
       .neq("status", "disconnected")
       .order("connected_at"),
@@ -47,6 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         id: a.id,
         platform: a.platform as Platform,
         name: a.username ?? a.display_name ?? a.platform,
+        avatarUrl: a.profile_image_url,
         status: a.status,
       }))}
       planLabel={planLabel}

@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { requireAppAccess } from "@/lib/auth/access";
 import { getHomeData } from "@/lib/data/home";
+import { getSuggestions } from "@/lib/data/suggestions";
+import { PostorySuggests } from "@/components/app/suggestions";
 import { getNetworkStates } from "@/lib/data/social";
 import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { formatRelativeDay, greeting, safeTimeZone } from "@/lib/time";
@@ -17,7 +19,12 @@ import { firstName, pluralize } from "@/lib/utils";
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
   const { user, profile, entitlements, adminRole } = await requireAppAccess();
   const tz = safeTimeZone(profile.timezone);
-  const [data, networks, { welcome }] = await Promise.all([getHomeData(user.id), getNetworkStates(user.id), searchParams]);
+  const [data, networks, { welcome }, suggestions] = await Promise.all([
+    getHomeData(user.id),
+    getNetworkStates(user.id),
+    searchParams,
+    getSuggestions(user.id, tz, profile.ai_preferences).catch(() => []),
+  ]);
   const name = firstName(profile.name);
   const connected = networks.flatMap((n) => n.accounts.map((a) => ({ ...a, platform: n.platform })));
 
@@ -56,6 +63,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           Generating and publishing posts still needs a plan on this account.
         </Notice>
       ) : null}
+
+      <PostorySuggests suggestions={suggestions} />
 
       <div className="mb-8 flex flex-wrap gap-2">
         {signals.length ? (

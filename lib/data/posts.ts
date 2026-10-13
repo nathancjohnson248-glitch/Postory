@@ -7,7 +7,7 @@ import type { PostStatus } from "@/lib/posts/state-machine";
 import type { Tables } from "@/types/database";
 
 export const POST_SELECT =
-  "id,story_id,platform,content,generated_content,last_edited_by,angle,reasoning,media_suggestion,media,status,scheduled_for,published_at,external_url,error_code,error_message,version,social_account_id,updated_at,created_at,stories(id,title,source_text),social_accounts(id,display_name,username,status)";
+  "id,story_id,platform,content,generated_content,last_edited_by,angle,reasoning,media_suggestion,media,status,scheduled_for,published_at,external_url,error_code,error_message,version,social_account_id,updated_at,created_at,stories(id,title,source_text),social_accounts(id,display_name,username,status,profile_image_url)";
 
 export type PostView = {
   id: string;
@@ -29,7 +29,7 @@ export type PostView = {
   errorCode: string | null;
   errorMessage: string | null;
   version: number;
-  account: { id: string; name: string; status: string } | null;
+  account: { id: string; name: string; displayName: string | null; handle: string | null; avatarUrl: string | null; status: string } | null;
   updatedAt: string;
   createdAt: string;
 };
@@ -58,7 +58,7 @@ type Row = Pick<
   | "created_at"
 > & {
   stories: { id: string; title: string; source_text: string } | null;
-  social_accounts: { id: string; display_name: string | null; username: string | null; status: string } | null;
+  social_accounts: { id: string; display_name: string | null; username: string | null; status: string; profile_image_url: string | null } | null;
 };
 
 /** Convert rows to view models, signing media URLs in one batch. */
@@ -91,7 +91,14 @@ export async function toPostViews(rows: Row[]): Promise<PostView[]> {
     errorMessage: r.error_message,
     version: r.version,
     account: r.social_accounts
-      ? { id: r.social_accounts.id, name: r.social_accounts.username ?? r.social_accounts.display_name ?? "Account", status: r.social_accounts.status }
+      ? {
+          id: r.social_accounts.id,
+          name: r.social_accounts.username ?? r.social_accounts.display_name ?? "Account",
+          displayName: r.social_accounts.display_name,
+          handle: r.social_accounts.username,
+          avatarUrl: r.social_accounts.profile_image_url,
+          status: r.social_accounts.status,
+        }
       : null,
     updatedAt: r.updated_at,
     createdAt: r.created_at,

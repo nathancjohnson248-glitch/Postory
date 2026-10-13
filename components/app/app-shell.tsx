@@ -21,13 +21,13 @@ import {
   Sparkle,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { PlatformIcon } from "@/components/brand/platform-icon";
+import { AccountAvatar } from "@/components/brand/account-avatar";
 import { Dialog } from "@/components/ui/dialog";
 import { UpgradeModal } from "@/components/app/upgrade-modal";
 import type { Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
-export type ShellAccount = { id: string; platform: Platform; name: string; status: string };
+export type ShellAccount = { id: string; platform: Platform; name: string; avatarUrl?: string | null; status: string };
 
 type NavItem = { href: string; label: string; icon: typeof Home; badge?: number };
 
@@ -136,7 +136,7 @@ export function AppShell({
               {accounts.slice(0, 8).map((a) => (
                 <li key={a.id}>
                   <Link href="/app/connections" className="flex h-8 items-center gap-2.5 rounded-lg px-3 text-[13px] text-ink-soft transition-colors hover:bg-wash">
-                    <PlatformIcon platform={a.platform} tile className="size-5 rounded-md" />
+                    <AccountAvatar src={a.avatarUrl} name={a.name} platform={a.platform} className="size-5 text-[11px]" />
                     <span className="min-w-0 flex-1 truncate">{a.name}</span>
                     <span
                       className={cn("size-1.5 rounded-full", a.status === "connected" ? "bg-success" : "bg-warning")}

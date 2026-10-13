@@ -71,3 +71,32 @@ export function factCorpus(ctx: BusinessContext, story: string) {
     .filter(Boolean)
     .join("\n");
 }
+
+/**
+ * What this business has said lately: recent stories and the posts written
+ * from them (published, scheduled or waiting), so new posts don't repeat the
+ * same news, hook or angle. Style comes from voice examples; this is about topics.
+ */
+export async function loadRecentContent(userId: string, excludeStoryId?: string | null) {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const [{ data: posts }, { data: stories }] = await Promise.all([
+    supabase
+      .from("story_posts")
+      .select("platform,status,angle,content,published_at,scheduled_for,created_at,story_id")
+      .eq("user_id", userId)
+      .in("status", ["published", "scheduled", "approved", "awaiting_review"])
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(24),
+    supabase.from("stories").select("id,title,created_at").eq("user_id", userId).is("archived_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(12),
+  ]);
+  const day = (iso: string | null) => (iso ? iso.slice(0, 10) : "");
+  const lines = [
+    ...(stories ?? []).filter((s) => s.id !== excludeStoryId).map((s) => `story ${day(s.created_at)}: ${s.title}`),
+    ...(posts ?? [])
+      .filter((p) => p.story_id !== excludeStoryId)
+      .map((p) => `${p.status} ${p.platform} ${day(p.published_at ?? p.scheduled_for ?? p.created_at)}${p.angle ? ` [${p.angle}]` : ""}: ${p.content.replace(/\s+/g, " ").slice(0, 160)}`),
+  ];
+  return lines.length ? lines.join("\n") : "";
+}

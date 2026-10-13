@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { AlertCircle, Check, Link2, RefreshCw, Unplug } from "lucide-react";
+import { AccountAvatar } from "@/components/brand/account-avatar";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Button } from "@/components/ui/button";
 import { ConfirmButton } from "@/components/ui/confirm-button";
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils";
 
 export type NetworkRow = {
   platform: Platform;
-  accounts: { id: string; displayName: string | null; username: string | null; status: string }[];
+  accounts: { id: string; displayName: string | null; username: string | null; avatarUrl?: string | null; status: string }[];
   lastError: string | null;
 };
 
@@ -108,6 +109,7 @@ export function NetworkList({
           const meta = PLATFORM_META[row.platform];
           const connected = row.accounts.filter((a) => a.status === "connected");
           const needsReconnect = row.accounts.filter((a) => a.status === "reconnect_required" || a.status === "error");
+          const primary = connected[0] ?? needsReconnect[0];
           const isConnecting = connecting === row.platform;
           const error = rowErrors[row.platform] ?? (connected.length === 0 ? row.lastError : null);
           const unavailable = availability[row.platform]?.available === false;
@@ -124,9 +126,15 @@ export function NetworkList({
           return (
             <li key={row.platform} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-4 sm:px-5">
               <div className="flex min-w-0 flex-1 items-center gap-3.5">
-                <PlatformIcon platform={row.platform} tile className="size-10 rounded-xl" />
+                {primary ? (
+                  <AccountAvatar src={primary.avatarUrl} name={primary.displayName ?? primary.username} platform={row.platform} className="size-10" />
+                ) : (
+                  <PlatformIcon platform={row.platform} tile className="size-10 rounded-xl" />
+                )}
                 <div className="min-w-0">
-                  <p className="text-[15px] font-semibold tracking-[-0.01em]">{meta.name}</p>
+                  <p className="truncate text-[15px] font-semibold tracking-[-0.01em]">
+                    {primary?.displayName && primary.displayName !== primary.username ? `${primary.displayName} · ${meta.name}` : meta.name}
+                  </p>
                   <p className={cn("flex items-center gap-1.5 text-[13px]", state.tone)}>
                     {state.icon}
                     <span className="truncate">

@@ -254,12 +254,15 @@ async function upsertAccounts(userId: string, accounts: ProviderAccount[], provi
       log.error("account already owned by another user", { operation: "social.upsertAccounts", userId, provider, resourceId: account.externalId });
       throw new UserFacingError("account_conflict", "That account is already connected to a different Postory workspace. Disconnect it there first.");
     }
+    const meta = account.metadata as { name?: string | null; username?: string | null; picture?: string | null };
+    const handle = meta.username ? `@${meta.username.replace(/^@/, "")}` : null;
     const row = {
       user_id: userId,
       provider,
       platform: account.platform,
-      display_name: account.displayName,
-      username: account.displayName,
+      display_name: meta.name ?? account.displayName,
+      username: handle ?? account.displayName,
+      profile_image_url: meta.picture && /^https:\/\//.test(meta.picture) ? meta.picture : null,
       external_account_id: account.externalId,
       status: account.needsReconnect ? "reconnect_required" : "connected",
       last_synced_at: now,
