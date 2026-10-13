@@ -44,7 +44,7 @@ const TOPICS: Topic[] = [
     body: (
       <>
         <p>
-          Open <strong>Connections</strong> and press <strong>Connect</strong> next to a network. You sign in on the network&apos;s own page and approve access — Postory never sees your password. Bluesky is coming soon; you can already write posts for it. Pins are saved to your first Pinterest board.
+          Open <strong>Connections</strong> and press <strong>Connect</strong> next to a network. You sign in on the network&apos;s own page and approve access — Postory never sees your password. Bluesky connects with an app password (Bluesky → Settings → Privacy and security → App passwords). Pins are saved to your first Pinterest board. TikTok only lets audited apps publish, so Postory writes TikTok captions for you to post from the app.
         </p>
         <p>Instagram needs a Business or Creator account, and Facebook posts go to a Page you manage. If a connection expires, the network shows <strong>Reconnect required</strong> and any scheduled posts for it wait until you reconnect.</p>
         <p>You can write posts for a network before it&apos;s connected; they stay as drafts until you connect it.</p>
@@ -70,7 +70,7 @@ const TOPICS: Topic[] = [
     body: (
       <>
         <p>
-          Approved posts can be published straight away or scheduled for a time in your timezone. Scheduled posts are sent by Postory&apos;s publishing partner, so your browser doesn&apos;t need to be open. See and move them on the <strong>Calendar</strong>.
+          Approved posts can be published straight away or scheduled for a time in your timezone. Postory sends scheduled posts itself at the time you set, so your browser doesn&apos;t need to be open. If your plan has ended by then, the post is held and you&apos;re emailed. See and move them on the <strong>Calendar</strong>.
         </p>
         <p>Nothing is ever published without your approval. If a network rejects a post, it&apos;s marked as failed with the reason, and you get an email.</p>
       </>
@@ -159,7 +159,7 @@ const TOPICS: Topic[] = [
     body: (
       <ul>
         <li>
-          <strong>&ldquo;Postory&apos;s writer is busy&rdquo;</strong> — the AI provider is rate-limited for a moment. Wait a minute and try again; nothing was used from your plan.
+          <strong>&ldquo;Postory&apos;s AI is busy&rdquo;</strong> — the AI model is rate-limited for a moment. Wait a minute and try again; nothing was used from your plan.
         </li>
         <li>
           <strong>Some posts need another attempt</strong> — Postory saved the posts it finished. Use the retry card on the story to write the rest.

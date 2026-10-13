@@ -14,11 +14,11 @@ import {
   LifeBuoy,
   LogOut,
   Menu,
-  PenLine,
   Plug,
   Plus,
   Settings,
   ShieldCheck,
+  Sparkle,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
@@ -50,18 +50,20 @@ export function AppShell({
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const primary: NavItem[] = [
-    { href: "/app", label: "Home", icon: Home },
-    { href: "/app/create", label: "Create", icon: PenLine },
-    { href: "/app/calendar", label: "Calendar", icon: CalendarDays },
+  // Home, Calendar, + and Library are the product; everything else lives under More.
+  const home: NavItem = { href: "/app", label: "Home", icon: Home };
+  const calendar: NavItem = { href: "/app/calendar", label: "Calendar", icon: CalendarDays };
+  const library: NavItem = { href: "/app/library", label: "Library", icon: Library, badge: reviewCount || undefined };
+  const primary: NavItem[] = [home, calendar, library];
+  const more: NavItem[] = [
+    { href: "/app/plan", label: "Plan", icon: Sparkle },
     { href: "/app/inbox", label: "Inbox", icon: Inbox },
-    { href: "/app/library", label: "Library", icon: Library, badge: reviewCount || undefined },
     { href: "/app/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/app/connections", label: "Connections", icon: Plug },
-  ];
-  const secondary: NavItem[] = [
-    ...(isAdmin ? [{ href: "/app/admin", label: "Admin", icon: ShieldCheck }] : []),
     { href: "/app/settings#memory", label: "Business memory", icon: Brain },
+  ];
+  const account: NavItem[] = [
+    ...(isAdmin ? [{ href: "/app/admin", label: "Admin", icon: ShieldCheck }] : []),
     { href: "/app/settings", label: "Settings", icon: Settings },
     { href: "/app/billing", label: "Billing", icon: CreditCard },
     { href: "/help", label: "Help", icon: LifeBuoy },
@@ -117,6 +119,8 @@ export function AppShell({
 
         <nav aria-label="Main" className="flex flex-col gap-0.5">
           {primary.map((item) => navLink(item))}
+          <p className="mb-1 mt-5 px-3 font-mono text-[10.5px] uppercase tracking-[0.14em] text-faint">More</p>
+          {more.map((item) => navLink(item))}
         </nav>
 
         <div className="mt-7">
@@ -149,7 +153,7 @@ export function AppShell({
         </div>
 
         <div className="mt-auto flex flex-col gap-0.5 border-t border-line pt-4">
-          {secondary.map((item) => navLink(item))}
+          {account.map((item) => navLink(item))}
           <div className="mt-3 flex items-center gap-3 rounded-2xl px-2 py-2">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-blue-50 text-[13px] font-semibold text-blue-700">{initials || "P"}</span>
             <div className="min-w-0 flex-1 leading-tight">
@@ -184,15 +188,14 @@ export function AppShell({
       {/* Mobile bottom navigation */}
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5 items-center px-2">
-          {[primary[0], primary[2]].map((item) => (
-            <MobileTab key={item.href} item={item} active={isActive(item.href)} />
-          ))}
+          <MobileTab item={home} active={isActive(home.href)} />
+          <MobileTab item={calendar} active={isActive(calendar.href)} />
           <div className="flex justify-center">
             <Link href="/app/create" className="-mt-5 grid size-14 place-items-center rounded-2xl bg-blue-500 text-white shadow-[0_10px_24px_-8px_rgb(47_91_255/0.7)] transition-transform active:scale-95" aria-label="Create story">
               <Plus className="size-6" />
             </Link>
           </div>
-          <MobileTab item={primary[4]} active={isActive(primary[4].href)} />
+          <MobileTab item={library} active={isActive(library.href)} />
           <button type="button" onClick={() => setMenuOpen(true)} className="flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted" aria-haspopup="dialog">
             <Menu className="size-5" aria-hidden />
             More
@@ -200,9 +203,11 @@ export function AppShell({
         </div>
       </nav>
 
-      <Dialog open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" className="lg:hidden">
+      <Dialog open={menuOpen} onClose={() => setMenuOpen(false)} title="More" className="lg:hidden">
         <div className="flex flex-col gap-1">
-          {[primary[1], primary[3], primary[5], primary[6], ...secondary].map((item) => navLink(item, () => setMenuOpen(false)))}
+          {more.map((item) => navLink(item, () => setMenuOpen(false)))}
+          <div className="my-1 border-t border-line" />
+          {account.map((item) => navLink(item, () => setMenuOpen(false)))}
           <form action="/auth/signout" method="post" className="mt-2 border-t border-line pt-2">
             <button className="flex h-9 w-full items-center gap-3 rounded-xl px-3 text-[14px] font-medium text-muted hover:bg-wash hover:text-ink">
               <LogOut className="size-[17px]" aria-hidden />

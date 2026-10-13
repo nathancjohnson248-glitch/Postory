@@ -155,7 +155,8 @@ export async function POST(request: NextRequest) {
           send({ type: "done", storyId, posts: result.posts.length, missingPlatforms: result.missingPlatforms });
           return;
         }
-        await supabase
+        // Angles are written only by the server (users can't edit them directly), so the angle picker can trust them.
+        await createAdminClient()
           .from("stories")
           .update({
             title: result.storyTitle,
@@ -168,7 +169,8 @@ export async function POST(request: NextRequest) {
               schedulingSuggestion: result.schedulingSuggestion,
             },
           })
-          .eq("id", storyId);
+          .eq("id", storyId)
+          .eq("user_id", user.id);
 
         send({ type: "done", storyId, posts: result.posts.length, missingPlatforms: result.missingPlatforms });
       } catch (error) {

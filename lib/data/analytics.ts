@@ -8,8 +8,8 @@ export type AnalyticsData = Awaited<ReturnType<typeof getAnalytics>>;
 
 /**
  * Publishing analytics computed from Postory's own records — every number
- * here is something Postory did for this user. Engagement metrics come only
- * from analytics_snapshots, which is filled solely from provider data.
+ * here is something Postory did for this user. Engagement comes only from
+ * story_posts.metrics, which is read back from the networks themselves.
  */
 export async function getAnalytics(userId: string, timezone: string, rangeDays: 30 | 90) {
   const supabase = await createClient();
@@ -24,7 +24,7 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
   const seriesStart = zonedToUtc(weekKeys[0], "00:00", timezone);
   const since = new Date(Math.min(rangeStart.getTime(), seriesStart.getTime())).toISOString();
 
-  const [{ data: published }, { data: created }, { count: storiesCount }, { data: snapshots }] = await Promise.all([
+  const [{ data: published }, { data: created }, { count: storiesCount }] = await Promise.all([
     supabase
       .from("story_posts")
       .select("id,platform,published_at,story_id,angle,content,metrics,stories(title)")
@@ -34,12 +34,6 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
       .order("published_at"),
     supabase.from("story_posts").select("status,created_at").eq("user_id", userId).gte("created_at", rangeStart.toISOString()),
     supabase.from("stories").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", rangeStart.toISOString()),
-    supabase
-      .from("analytics_snapshots")
-      .select("platform,metric_date,followers,impressions,engagements")
-      .eq("user_id", userId)
-      .gte("metric_date", addDaysToKey(today, -rangeDays))
-      .order("metric_date"),
   ]);
 
   const all = (published ?? []) as unknown as {
@@ -145,7 +139,6 @@ export async function getAnalytics(userId: string, timezone: string, rangeDays: 
       dayparts: Object.entries(hourBuckets).map(([label, value]) => ({ label, value })),
       byAngle,
     },
-    engagement: snapshots ?? [],
     topPosts,
     engagementByNetwork,
     headlines,

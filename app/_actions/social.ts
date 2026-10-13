@@ -7,36 +7,37 @@ import { idSchema, platformSchema } from "@/lib/validation/schemas";
 import { UserFacingError } from "@/lib/errors";
 import { runAction } from "./_run";
 
-const returnPathSchema = z.enum(["/onboarding", "/app/connections"]).catch("/app/connections");
+function refresh() {
+  revalidatePath("/onboarding");
+  revalidatePath("/app", "layout");
+}
 
-export async function connectNetwork(platform: string, returnPath: string) {
+/** Start connecting: a Nango Connect UI token, or a request for Bluesky credentials. */
+export async function connectNetwork(platform: string) {
   return runAction("social.connect", async (user) => {
     const parsed = platformSchema.safeParse(platform);
     if (!parsed.success) throw new UserFacingError("invalid_platform", "Unknown network.");
-    const { attemptId, descriptor } = await social.startConnection(user.id, parsed.data, returnPathSchema.parse(returnPath));
-    if (descriptor.kind === "redirect") return { kind: "redirect" as const, url: descriptor.url, attemptId, newTab: Boolean(descriptor.newTab) };
-    if (descriptor.kind === "session") return { kind: "session" as const, token: descriptor.token, attemptId };
-    return { kind: "credentials" as const, attemptId, fields: descriptor.fields };
+    return social.startConnection(user.id, parsed.data);
   });
 }
 
-/** After connecting in a new tab: ask the provider what's now connected. */
+/** Nango's Connect UI finished: ask Nango what's now connected. */
 export async function finishConnection(attemptId: string) {
   return runAction("social.finish", async (user) => {
-    const accounts = await social.completeConnection(user.id, idSchema.parse(attemptId), null);
-    revalidatePath("/onboarding");
-    revalidatePath("/app", "layout");
+    const accounts = await social.completeConnection(user.id, idSchema.parse(attemptId));
+    refresh();
     return { connected: accounts.length };
   });
 }
 
-export async function submitNetworkCredentials(attemptId: string, fields: Record<string, string>) {
-  return runAction("social.credentials", async (user) => {
-    const id = idSchema.parse(attemptId);
-    const clean = z.record(z.string().max(64), z.string().max(500)).parse(fields);
-    const accounts = await social.completeCredentialsConnection(user.id, id, clean);
-    revalidatePath("/onboarding");
-    revalidatePath("/app", "layout");
+const BlueskyInput = z.object({ identifier: z.string().trim().min(3).max(253), appPassword: z.string().trim().min(8).max(64) });
+
+export async function connectBlueskyAccount(attemptId: string, input: { identifier: string; appPassword: string }) {
+  return runAction("social.bluesky", async (user) => {
+    const parsed = BlueskyInput.safeParse(input);
+    if (!parsed.success) throw new UserFacingError("invalid", "Enter your Bluesky handle and an app password.");
+    const accounts = await social.connectBluesky(user.id, idSchema.parse(attemptId), parsed.data);
+    refresh();
     return { connected: accounts.length };
   });
 }
@@ -44,8 +45,7 @@ export async function submitNetworkCredentials(attemptId: string, fields: Record
 export async function disconnectNetwork(socialAccountId: string) {
   return runAction("social.disconnect", async (user) => {
     const result = await social.disconnectAccount(user.id, idSchema.parse(socialAccountId));
-    revalidatePath("/onboarding");
-    revalidatePath("/app", "layout");
+    refresh();
     return result;
   });
 }
@@ -53,8 +53,7 @@ export async function disconnectNetwork(socialAccountId: string) {
 export async function syncNetworks() {
   return runAction("social.sync", async (user) => {
     const accounts = await social.syncAccounts(user.id);
-    revalidatePath("/onboarding");
-    revalidatePath("/app", "layout");
+    refresh();
     return { count: accounts.length };
   });
 }

@@ -5,12 +5,14 @@ import {
   authEmailMode,
   confirmWithoutEmail,
   createConfirmedAccount,
+  markEmailProven,
   resendSignupCode,
   sendEmailCode,
   sendPasswordResetCode,
   signInWithVerifiedGoogle,
   startSignupWithCode,
 } from "@/lib/auth/email-codes";
+import { clearFailures, lockedFor, lockedMessage, recordFailure } from "@/lib/auth/attempts";
 import { verifyGoogleLogin } from "@/lib/auth/privy";
 import { requestOrigin } from "@/lib/auth/origin";
 import { clearPendingEmail, getPendingEmail, setPendingEmail } from "@/lib/auth/pending";
@@ -75,8 +77,13 @@ export async function signIn(_prev: AuthFormState, formData: FormData): Promise<
   const parsed = SignInSchema.safeParse({ email: formData.get("email"), password: formData.get("password") });
   if (!parsed.success) return { error: firstError(parsed.error), email: String(formData.get("email") ?? "") };
 
+  const locked = lockedFor("password", parsed.data.email);
+  if (locked) return { error: lockedMessage(locked), email: parsed.data.email };
+
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error && !isUnconfirmed(error)) recordFailure("password", parsed.data.email);
+  if (!error) clearFailures("password", parsed.data.email);
   if (error) {
     // Auth only reports "not confirmed" after the password checks out, so
     // this can't be used to probe for accounts. Send a fresh code and go to
@@ -211,11 +218,19 @@ export async function verifySignupCode(_prev: AuthFormState, formData: FormData)
   const code = emailCodeSchema.safeParse(formData.get("code"));
   if (!code.success) return { error: firstError(code.error), attempt: Date.now() };
 
+  const locked = lockedFor("code", pending.email);
+  if (locked) return { error: lockedMessage(locked), attempt: Date.now() };
+
   const supabase = await createClient();
   let { data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "email" });
   // Login codes are recovery tokens; accept them on the recovery path too.
   if (error && !pending.fresh) ({ data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "recovery" }));
-  if (error) return { error: friendlyAuthError(error), attempt: Date.now() };
+  if (error) {
+    recordFailure("code", pending.email);
+    return { error: friendlyAuthError(error), attempt: Date.now() };
+  }
+  clearFailures("code", pending.email);
+  if (data.user) await markEmailProven(data.user.id);
 
   await clearPendingEmail("verify");
   if (!pending.fresh) redirect("/app");
@@ -361,8 +376,15 @@ export async function resetPassword(_prev: AuthFormState, formData: FormData): P
     if (!pending) return { error: "This reset has timed out. Request a new code." };
     const code = emailCodeSchema.safeParse(formData.get("code"));
     if (!code.success) return { error: firstError(code.error), attempt: Date.now() };
-    const { error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "recovery" });
-    if (error) return { error: friendlyAuthError(error), attempt: Date.now() };
+    const locked = lockedFor("reset", pending.email);
+    if (locked) return { error: lockedMessage(locked), attempt: Date.now() };
+    const { data: verified, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "recovery" });
+    if (error) {
+      recordFailure("reset", pending.email);
+      return { error: friendlyAuthError(error), attempt: Date.now() };
+    }
+    clearFailures("reset", pending.email);
+    if (verified.user) await markEmailProven(verified.user.id);
   }
 
   const { error } = await supabase.auth.updateUser({ password: password.data });

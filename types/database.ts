@@ -33,56 +33,6 @@ export type Database = {
         }
         Relationships: []
       }
-      analytics_snapshots: {
-        Row: {
-          created_at: string
-          engagements: number | null
-          followers: number | null
-          id: string
-          impressions: number | null
-          metric_date: string
-          metrics: Json
-          platform: string
-          social_account_id: string | null
-          source: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          engagements?: number | null
-          followers?: number | null
-          id?: string
-          impressions?: number | null
-          metric_date: string
-          metrics?: Json
-          platform: string
-          social_account_id?: string | null
-          source?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          engagements?: number | null
-          followers?: number | null
-          id?: string
-          impressions?: number | null
-          metric_date?: string
-          metrics?: Json
-          platform?: string
-          social_account_id?: string | null
-          source?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "analytics_snapshots_social_account_id_fkey"
-            columns: ["social_account_id"]
-            isOneToOne: false
-            referencedRelation: "social_accounts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       auth_email_sends: {
         Row: {
           created_at: string
@@ -179,12 +129,37 @@ export type Database = {
         }
         Relationships: []
       }
+      content_plans: {
+        Row: {
+          created_at: string
+          horizon_days: number
+          id: string
+          plan: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          horizon_days: number
+          id?: string
+          plan: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          horizon_days?: number
+          id?: string
+          plan?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_items: {
         Row: {
           author_handle: string | null
           author_name: string | null
           category: string
           content: string
+          context: Json
           created_at: string
           external_id: string
           external_url: string | null
@@ -196,6 +171,7 @@ export type Database = {
           reply_draft: string | null
           reply_status: string
           social_account_id: string | null
+          story_post_id: string | null
           updated_at: string
           user_id: string
         }
@@ -204,6 +180,7 @@ export type Database = {
           author_name?: string | null
           category?: string
           content: string
+          context?: Json
           created_at?: string
           external_id: string
           external_url?: string | null
@@ -215,6 +192,7 @@ export type Database = {
           reply_draft?: string | null
           reply_status?: string
           social_account_id?: string | null
+          story_post_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -223,6 +201,7 @@ export type Database = {
           author_name?: string | null
           category?: string
           content?: string
+          context?: Json
           created_at?: string
           external_id?: string
           external_url?: string | null
@@ -234,6 +213,7 @@ export type Database = {
           reply_draft?: string | null
           reply_status?: string
           social_account_id?: string | null
+          story_post_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -391,25 +371,25 @@ export type Database = {
         }
         Relationships: []
       }
-      social_workspaces: {
+      social_credentials: {
         Row: {
           created_at: string
-          external_profile_id: string
-          provider: string
+          secret: string
+          social_account_id: string
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          external_profile_id: string
-          provider?: string
+          secret: string
+          social_account_id: string
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
-          external_profile_id?: string
-          provider?: string
+          secret?: string
+          social_account_id?: string
           updated_at?: string
           user_id?: string
         }
@@ -476,7 +456,6 @@ export type Database = {
           platform_post_id: string | null
           metrics: Json | null
           metrics_synced_at: string | null
-          provider_batch_id: string | null
           publish_attempts: number
           published_at: string | null
           reasoning: string | null
@@ -506,7 +485,6 @@ export type Database = {
           platform_post_id?: string | null
           metrics?: Json | null
           metrics_synced_at?: string | null
-          provider_batch_id?: string | null
           publish_attempts?: number
           published_at?: string | null
           reasoning?: string | null
@@ -536,7 +514,6 @@ export type Database = {
           platform_post_id?: string | null
           metrics?: Json | null
           metrics_synced_at?: string | null
-          provider_batch_id?: string | null
           publish_attempts?: number
           published_at?: string | null
           reasoning?: string | null

@@ -14,7 +14,7 @@ export default function PrivacyPage() {
         <ul>
           <li><strong>Account details:</strong> your name, email address and sign-in method (email and password, or Google).</li>
           <li><strong>Business information you give us:</strong> your business profile, voice preferences, business memory, stories and posts, and media you upload or generate.</li>
-          <li><strong>Connected accounts:</strong> the display name and identifiers of social accounts you connect. Access tokens are held by our publishing provider, not by Postory.</li>
+          <li><strong>Connected accounts:</strong> the display name and identifiers of social accounts you connect. OAuth access tokens are held by Nango, not stored in Postory&apos;s database. A Bluesky app password, if you connect Bluesky, is stored encrypted and used only to post and read replies.</li>
           <li><strong>Billing status:</strong> your plan, trial and subscription status from our payment provider. We never receive or store your full card details.</li>
           <li><strong>Usage and technical data:</strong> feature usage needed to apply plan limits, and server logs used to keep the service secure and working.</li>
         </ul>
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         </ul>
         <p>We don&apos;t sell your personal information, and we don&apos;t use your content to advertise to you.</p>
         <h2>Service providers</h2>
-        <p>We rely on a small number of providers to operate Postory, each only for its purpose: Supabase (database, authentication and file storage), Publora (connecting your social accounts, publishing and reading back post statistics), HandyPay (subscriptions and payments), Google Gemini and Groq (AI writing), Cloudflare Workers AI (AI images), Privy (Google sign-in), Zoho Mail (email) and Railway (hosting). When you use AI features, the relevant story text and business information are sent to the AI provider to produce your drafts; image requests contain a description of the image, not your account details.</p>
+        <p>We rely on a small number of providers to operate Postory, each only for its purpose: Supabase (database, authentication and file storage), Nango (holding the access tokens for the social accounts you connect), Replicate (running the AI models that write posts and make images), HandyPay (subscriptions and payments), Privy (Google sign-in), Zoho Mail (email) and Railway (hosting). Postory talks to each social network&apos;s own API to publish and to read back engagement and comments on posts it published. When you use AI features, the relevant story text and business information are sent to the AI provider to produce your drafts; image requests contain a description of the image, not your account details.</p>
         <h2>Retention and deletion</h2>
         <p>Your content stays in Postory until you delete it or delete your account. Ending a trial or subscription, or disconnecting a social account, doesn&apos;t delete your content. Deleting your account permanently removes your profile, stories, posts, business memory, media and connections from Postory. Posts already published to social networks stay on those networks; remove them there if you wish.</p>
         <h2>Security</h2>

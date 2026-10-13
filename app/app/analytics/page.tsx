@@ -12,9 +12,14 @@ import { requireAppAccess } from "@/lib/auth/access";
 import { getAnalytics } from "@/lib/data/analytics";
 import { syncPostMetrics } from "@/lib/social/service";
 import { getEntitlements } from "@/lib/entitlements";
-import { PLATFORM_META, type Platform } from "@/lib/social/platforms";
+import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms";
 import { safeTimeZone } from "@/lib/time";
 import { cn } from "@/lib/utils";
+
+const METRIC_NETWORKS = PLATFORMS.filter((p) => PLATFORM_META[p].can.metrics)
+  .map((p) => PLATFORM_META[p].name)
+  .join(", ")
+  .replace(/, ([^,]*)$/, " and $1");
 
 export const metadata: Metadata = { title: "Analytics" };
 
@@ -101,7 +106,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
           </div>
 
           {data.topPosts.length ? (
-            <Section title="What people engaged with" description="Reactions, comments and reposts reported by the network. LinkedIn and Bluesky for now.">
+            <Section title="What people engaged with" description={`Reactions, comments and reposts, as each network reports them. Refreshed every couple of hours.`}>
               <ul className="stagger-in flex flex-col px-2 pb-2">
                 {data.topPosts.map((p) => (
                   <li key={p.id}>
@@ -197,8 +202,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
       {data.topPosts.length ? null : (
         <Notice tone="info" title="Engagement shows up as networks report it." className="mt-6">
-          Reactions, comments and reposts are read back from LinkedIn and Bluesky once your posts there are live; other networks don&apos;t share them with
-          Postory&apos;s publishing provider yet. Nothing here is estimated.
+          Once a post is live, Postory reads its likes, comments and reposts back from {METRIC_NETWORKS}. LinkedIn only shares post stats with its
+          approved partner apps, so LinkedIn posts show as published without engagement. Nothing here is estimated.
         </Notice>
       )}
     </>

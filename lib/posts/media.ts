@@ -8,8 +8,6 @@ export const PostMediaSchema = z.object({
   contentType: z.string().min(1),
   source: z.enum(["upload", "ai"]),
   altText: z.string().max(1000).optional(),
-  /** LetMePost `med_…` id, cached so a retry doesn't re-upload. */
-  providerMediaId: z.string().optional(),
   createdAt: z.string(),
 });
 

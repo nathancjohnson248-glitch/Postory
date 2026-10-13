@@ -6,6 +6,7 @@ import { BillingUnavailableError } from "@/lib/billing/handypay";
 import { ConfigurationError } from "@/lib/env";
 import { EntitlementError } from "@/lib/entitlements";
 import { GenerationError } from "@/lib/ai/generate-posts";
+import { LlmError } from "@/lib/ai/llm";
 import { fail, ok, UserFacingError, type ActionResult } from "@/lib/errors";
 import { log } from "@/lib/log";
 import { InvalidTransitionError } from "@/lib/posts/state-machine";
@@ -22,9 +23,13 @@ export function toFailure(error: unknown, operation: string, userId?: string): R
     return fail(
       `ai_${error.code}`,
       error.code === "provider_error" || error.code === "unavailable"
-        ? "Postory's writer is unavailable right now. Nothing was used from your plan. Try again shortly."
+        ? `${error.message.replace(/\.?$/, ".")} Nothing was used from your plan.`
         : error.message,
     );
+  }
+  if (error instanceof LlmError) {
+    log.warn("ai call failed", { operation, userId, code: error.code }, error);
+    return fail(`ai_${error.code}`, `${error.message} Nothing was used from your plan.`);
   }
   if (error instanceof ConfigurationError) {
     log.warn("feature not configured", { operation, userId, variable: error.variable });

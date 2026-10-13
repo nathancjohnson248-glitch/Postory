@@ -248,7 +248,7 @@ export default function HomePage() {
                   Need a visual? <em>Make one.</em>
                 </>
               }
-              body="Create an image for the post you're looking at, sized for where it's going — portrait for Instagram, wide for X and LinkedIn. Or upload your own. Instagram, Pinterest and TikTok posts always get the media they need before they can go out."
+              body="Create an image for the post you're looking at, sized for where it's going — portrait for Instagram, wide for X and LinkedIn. Or upload your own. Instagram and Pinterest posts always get the image they need before they can go out."
             />
             <p className="mt-6 flex items-center gap-2 text-[14px] text-muted">
               <ImageIcon className="size-4 text-blue-600" aria-hidden /> Every plan includes AI images each month.
@@ -268,7 +268,7 @@ export default function HomePage() {
                   Your whole social week, <em>in one place.</em>
                 </>
               }
-              body="See what's going out and when, in your timezone. Drag a post to another day to move it. Everything scheduled is executed by the publisher, not left to chance."
+              body="See what's going out and when, in your timezone. Drag a post to another day to move it. Postory sends scheduled posts itself at the time you set, and tells you if a network refuses one."
             />
             <ul className="mt-8 flex flex-col gap-3 text-[15px] text-ink-soft">
               {["Month and agenda views", "Drag to reschedule", "Approved posts ready to plan"].map((t) => (

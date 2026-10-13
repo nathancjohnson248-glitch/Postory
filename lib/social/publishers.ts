@@ -10,14 +10,22 @@ import "server-only";
  *   Instagram   POST /v25.0/{id}/media, /media_publish          (Instagram API with Instagram Login)
  *   Pinterest   GET /v5/boards, POST /v5/pins                   (developers.pinterest.com/docs/api/v5)
  *   Facebook    GET /v25.0/me/accounts, POST /{page}/feed|photos with the Page token
+ *
+ * Reading back (only where the network's API offers it to apps like Postory;
+ * see `can` in ./platforms.ts):
+ *   metrics   X /2/tweets?tweet.fields=public_metrics · Threads /{id}/insights ·
+ *             Instagram /{id}?fields=like_count,comments_count ·
+ *             Facebook /{post}?fields=reactions/comments/shares · Pinterest /v5/pins/{id}/analytics
+ *   comments  Threads /{id}/replies · Instagram /{id}/comments · Facebook /{post}/comments
+ *   replies   Threads reply_to_id · Instagram /{comment}/replies · Facebook /{comment}/comments
  */
 
 import type { Platform } from "./platforms";
 import { accessToken, proxy, proxyWithHeaders, type ProxyTarget } from "./nango";
-import { SocialProviderError } from "./types";
+import { SocialProviderError, type PostMetrics, type RemoteComment } from "./types";
 
 export type Profile = { id: string; username: string | null; name: string | null; avatar: string | null };
-export type Published = { postId: string; url: string | null };
+type Published = { postId: string; url: string | null };
 
 const LINKEDIN_HEADERS = { "LinkedIn-Version": "202609", "X-Restli-Protocol-Version": "2.0.0" };
 
@@ -227,6 +235,134 @@ async function publishFacebook(t: ProxyTarget, text: string, imageUrl: string | 
 async function facebookPermalink(t: ProxyTarget, id: string, auth: string) {
   const r = await proxy<{ permalink_url?: string }>(t, `/v25.0/${id}?fields=permalink_url&${auth}`).catch(() => null);
   return r?.permalink_url ?? null;
+}
+
+// --- Engagement -------------------------------------------------------------------
+
+const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null);
+
+/** Engagement for posts Postory published, keyed by post id. Posts the network won't report on are left out. */
+export async function metrics(platform: Platform, t: ProxyTarget, postIds: string[]): Promise<Record<string, PostMetrics>> {
+  const out: Record<string, PostMetrics> = {};
+  if (!postIds.length) return out;
+  switch (platform) {
+    case "x": {
+      for (let i = 0; i < postIds.length; i += 100) {
+        const ids = postIds.slice(i, i + 100).join(",");
+        const r = await proxy<{ data?: { id: string; public_metrics?: Record<string, number> }[] }>(t, `/2/tweets?ids=${ids}&tweet.fields=public_metrics`);
+        for (const d of r.data ?? []) {
+          const m = d.public_metrics ?? {};
+          out[d.id] = { impressions: n(m.impression_count), reach: null, reactions: n(m.like_count), comments: n(m.reply_count), reposts: (n(m.retweet_count) ?? 0) + (n(m.quote_count) ?? 0) };
+        }
+      }
+      return out;
+    }
+    case "threads": {
+      for (const id of postIds) {
+        type Insight = { name: string; values?: { value?: number }[]; total_value?: { value?: number } };
+        const r = await proxy<{ data?: Insight[] }>(t, `/v1.0/${id}/insights?metric=views,likes,replies,reposts,quotes`).catch(() => null);
+        if (!r?.data) continue;
+        const v = (name: string) => {
+          const row = r.data!.find((d) => d.name === name);
+          return n(row?.total_value?.value ?? row?.values?.[0]?.value);
+        };
+        out[id] = { impressions: v("views"), reach: null, reactions: v("likes"), comments: v("replies"), reposts: (v("reposts") ?? 0) + (v("quotes") ?? 0) };
+      }
+      return out;
+    }
+    case "instagram": {
+      for (const id of postIds) {
+        const r = await proxy<{ like_count?: number; comments_count?: number }>(t, `/v25.0/${id}?fields=like_count,comments_count`).catch(() => null);
+        if (r) out[id] = { impressions: null, reach: null, reactions: n(r.like_count), comments: n(r.comments_count), reposts: null };
+      }
+      return out;
+    }
+    case "facebook": {
+      const page = await facebookPage(t);
+      const auth = `access_token=${encodeURIComponent(page.token)}`;
+      for (const id of postIds) {
+        type Fb = { reactions?: { summary?: { total_count?: number } }; comments?: { summary?: { total_count?: number } }; shares?: { count?: number } };
+        const r = await proxy<Fb>(t, `/v25.0/${id}?fields=reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0),shares&${auth}`).catch(() => null);
+        if (r) out[id] = { impressions: null, reach: null, reactions: n(r.reactions?.summary?.total_count), comments: n(r.comments?.summary?.total_count), reposts: n(r.shares?.count) ?? 0 };
+      }
+      return out;
+    }
+    case "pinterest": {
+      const day = (d: Date) => d.toISOString().slice(0, 10);
+      const end = new Date();
+      const start = new Date(Date.now() - 89 * 86_400_000);
+      for (const id of postIds) {
+        type Totals = Record<string, number>;
+        const r = await proxy<{ all?: { summary_metrics?: Totals; lifetime_metrics?: Totals } }>(
+          t,
+          `/v5/pins/${id}/analytics?start_date=${day(start)}&end_date=${day(end)}&metric_types=IMPRESSION,SAVE,PIN_CLICK`,
+        ).catch(() => null);
+        const m = r?.all?.summary_metrics ?? r?.all?.lifetime_metrics;
+        if (m) out[id] = { impressions: n(m.IMPRESSION), reach: null, reactions: n(m.PIN_CLICK), comments: null, reposts: n(m.SAVE) };
+      }
+      return out;
+    }
+    default:
+      return out;
+  }
+}
+
+/** Comments on one published post, newest networks' shapes normalised. */
+export async function comments(platform: Platform, t: ProxyTarget, postId: string): Promise<RemoteComment[]> {
+  switch (platform) {
+    case "threads": {
+      const r = await proxy<{ data?: { id: string; text?: string; username?: string; timestamp?: string; permalink?: string }[] }>(
+        t,
+        `/v1.0/${postId}/replies?fields=id,text,username,timestamp,permalink`,
+      );
+      return (r.data ?? []).map((c) => ({ id: c.id, authorName: null, authorHandle: c.username ? `@${c.username}` : null, text: c.text ?? "", createdAt: c.timestamp ?? new Date().toISOString(), url: c.permalink ?? null, context: {} }));
+    }
+    case "instagram": {
+      const r = await proxy<{ data?: { id: string; text?: string; username?: string; timestamp?: string }[] }>(t, `/v25.0/${postId}/comments?fields=id,text,username,timestamp`);
+      return (r.data ?? []).map((c) => ({ id: c.id, authorName: null, authorHandle: c.username ? `@${c.username}` : null, text: c.text ?? "", createdAt: c.timestamp ?? new Date().toISOString(), url: null, context: {} }));
+    }
+    case "facebook": {
+      const page = await facebookPage(t);
+      const r = await proxy<{ data?: { id: string; message?: string; from?: { id?: string; name?: string }; created_time?: string; permalink_url?: string }[] }>(
+        t,
+        `/v25.0/${postId}/comments?fields=id,message,from,created_time,permalink_url&access_token=${encodeURIComponent(page.token)}`,
+      );
+      return (r.data ?? [])
+        .filter((c) => c.from?.id !== page.id)
+        .map((c) => ({ id: c.id, authorName: c.from?.name ?? null, authorHandle: null, text: c.message ?? "", createdAt: c.created_time ?? new Date().toISOString(), url: c.permalink_url ?? null, context: {} }));
+    }
+    default:
+      return [];
+  }
+}
+
+/** Post a reply to a comment. Returns the reply's id. */
+export async function reply(platform: Platform, t: ProxyTarget, commentId: string, text: string): Promise<string> {
+  switch (platform) {
+    case "threads": {
+      const me = await proxy<{ id?: string }>(t, "/v1.0/me?fields=id");
+      if (!me.id) throw unexpected();
+      const q = new URLSearchParams({ media_type: "TEXT", text, reply_to_id: commentId });
+      const container = await proxy<{ id?: string }>(t, `/v1.0/${me.id}/threads?${q}`, { method: "POST" });
+      if (!container.id) throw unexpected();
+      const published = await proxy<{ id?: string }>(t, `/v1.0/${me.id}/threads_publish?creation_id=${encodeURIComponent(container.id)}`, { method: "POST" });
+      if (!published.id) throw unexpected();
+      return published.id;
+    }
+    case "instagram": {
+      const r = await proxy<{ id?: string }>(t, `/v25.0/${commentId}/replies`, { method: "POST", json: { message: text } });
+      if (!r.id) throw unexpected();
+      return r.id;
+    }
+    case "facebook": {
+      const page = await facebookPage(t);
+      const r = await proxy<{ id?: string }>(t, `/v25.0/${commentId}/comments?access_token=${encodeURIComponent(page.token)}`, { method: "POST", json: { message: text } });
+      if (!r.id) throw unexpected();
+      return r.id;
+    }
+    default:
+      throw new SocialProviderError("platform_not_enabled", "Replying on this network isn't available.");
+  }
 }
 
 // --- Helpers ------------------------------------------------------------------------

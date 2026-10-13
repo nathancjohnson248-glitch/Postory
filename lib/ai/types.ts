@@ -4,7 +4,7 @@ import { PLATFORMS } from "@/lib/social/platforms";
 /**
  * Two layers of schema:
  *  - *Model* schemas are what the model is asked to produce (kept free of
- *    length constraints so they compile to OpenAI strict JSON schema).
+ *    length constraints, which keeps the JSON Schema the model sees simple).
  *  - *Validated* schemas are applied afterwards. Model output is never
  *    trusted until it passes these.
  */
@@ -95,3 +95,39 @@ export type AssistantReply = z.infer<typeof ValidatedAssistantReply>;
 export type AssistantProposal = AssistantReply["proposals"][number];
 
 export const ModelReplyDraft = z.object({ reply: z.string(), category: z.enum(["needs_reply", "potential_customer", "mention"]) });
+
+/** The content planner: opportunities grounded in what Postory knows, plus questions where it doesn't. */
+export const ModelPlan = z.object({
+  summary: z.string(),
+  ideas: z.array(
+    z.object({
+      title: z.string(),
+      why: z.string(),
+      basedOn: z.enum(["recent_story", "memory", "network_gap", "follow_up"]),
+      networks: z.array(z.enum(PLATFORMS)),
+      day: z.string().nullable(),
+      storyPrompt: z.string(),
+      question: z.string().nullable(),
+    }),
+  ),
+  questions: z.array(z.string()),
+});
+
+export const ValidatedPlan = z.object({
+  summary: z.string().trim().min(1).max(600),
+  ideas: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(120),
+        why: z.string().trim().min(1).max(400),
+        basedOn: z.enum(["recent_story", "memory", "network_gap", "follow_up"]),
+        networks: z.array(z.enum(PLATFORMS)).max(8),
+        day: z.string().trim().max(40).nullable(),
+        storyPrompt: z.string().trim().min(1).max(1200),
+        question: z.string().trim().max(300).nullable(),
+      }),
+    )
+    .max(10),
+  questions: z.array(z.string().trim().min(1).max(300)).max(6),
+});
+export type Plan = z.infer<typeof ValidatedPlan>;

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { generateStructured, LlmError } from "./llm";
-import { ASSISTANT_SYSTEM, REPLY_SYSTEM, renderBusinessContext, type BusinessContext } from "./prompts";
+import { ASSISTANT_SYSTEM, REPLY_SYSTEM, asData, renderBusinessContext, type BusinessContext } from "./prompts";
 import { ModelAssistantReply, ModelReplyDraft, ValidatedAssistantReply } from "./types";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
@@ -16,7 +16,7 @@ export async function askAssistant(input: { messages: ChatMessage[]; context: Bu
   const workspace = `WORKSPACE (current time ${input.workspace.now}, owner's timezone ${input.workspace.timezone}):\n${
     input.workspace.posts.length
       ? input.workspace.posts
-          .map((p) => `- postId=${p.id} | ${p.platform} | ${p.status}${p.scheduledFor ? ` | scheduled ${p.scheduledFor}` : ""} | story: ${p.story} | <post>${p.content.slice(0, 280)}</post>`)
+          .map((p) => `- postId=${p.id} | ${p.platform} | ${p.status}${p.scheduledFor ? ` | scheduled ${p.scheduledFor}` : ""} | story: ${asData(p.story)} | <post>${asData(p.content.slice(0, 280))}</post>`)
           .join("\n")
       : "(no posts yet)"
   }`;
@@ -49,7 +49,7 @@ export async function askAssistant(input: { messages: ChatMessage[]; context: Bu
 export async function draftReply(input: { comment: string; author: string | null; platform: string; context: BusinessContext }) {
   const raw = await generateStructured({
     system: `${REPLY_SYSTEM}\n\n${renderBusinessContext(input.context)}`,
-    turns: [{ role: "user", content: `Platform: ${input.platform}\nFrom: ${input.author ?? "someone"}\n<post>${input.comment}</post>\nDraft a reply.` }],
+    turns: [{ role: "user", content: `Platform: ${input.platform}\nFrom: ${asData(input.author ?? "someone")}\n<comment>\n${asData(input.comment)}\n</comment>\nDraft a reply to that comment.` }],
     schema: ModelReplyDraft,
     name: "reply_draft",
   });

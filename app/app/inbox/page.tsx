@@ -10,11 +10,16 @@ import { aiAvailable } from "@/lib/ai/client";
 import { requireAppAccess } from "@/lib/auth/access";
 import { getEntitlements } from "@/lib/entitlements";
 import { createClient } from "@/lib/supabase/server";
-import type { Platform } from "@/lib/social/platforms";
+import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms";
+import { syncInbox } from "@/lib/social/service";
 import { formatRelativeDay, safeTimeZone } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Inbox" };
+
+const list = (names: string[]) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? ""));
+const INBOX_NETWORKS = list(PLATFORMS.filter((p) => PLATFORM_META[p].can.comments).map((p) => PLATFORM_META[p].name));
+const NO_INBOX = list(PLATFORMS.filter((p) => PLATFORM_META[p].can.publish && !PLATFORM_META[p].can.comments).map((p) => PLATFORM_META[p].name));
 
 const TABS = [
   { id: "needs_reply", label: "Needs reply" },
@@ -44,6 +49,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   }
 
   const active = TABS.find((t) => t.id === tab) ?? TABS[0];
+  // Fresh comments, within a short budget so the page never hangs on a slow network.
+  await Promise.race([syncInbox(user.id), new Promise((r) => setTimeout(r, 4000))]);
   const supabase = await createClient();
   const [{ data: items }, { data: counts }] = await Promise.all([
     supabase
@@ -60,9 +67,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader title="Inbox" description="Comments, replies and mentions that need you — in one short list." />
-      <Notice tone="info" title="Nothing can arrive here yet." className="mb-6">
-        Postory&apos;s publishing partner doesn&apos;t share comments, replies or messages back yet. The inbox is
-        ready for when it does — until then it stays empty rather than showing anything made up.
+      <Notice tone="info" title={`Comments on posts Postory published to ${INBOX_NETWORKS}.`} className="mb-6">
+        Postory checks for new comments when you open the inbox. {NO_INBOX} only share comments with approved partner apps, so reply to those on
+        the network itself. Every reply waits for you to press Send.
       </Notice>
       <nav aria-label="Inbox categories" className="scrollbar-none -mx-1 mb-6 flex gap-1 overflow-x-auto px-1">
         {TABS.map((t) => (
@@ -98,7 +105,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           ))}
         </div>
       ) : (
-        <EmptyState icon={<Inbox className="size-5" />} title="All quiet." description={active.id === "replied" ? "Conversations you've answered land here." : "Nothing is waiting for a reply."} />
+        <EmptyState icon={<Inbox className="size-5" />} title="All quiet." description={active.id === "replied" ? "Conversations you've answered land here." : "You're caught up. Comments on posts Postory publishes show up here."} />
       )}
     </>
   );

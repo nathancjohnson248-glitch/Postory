@@ -1,62 +1,35 @@
 import type { Platform } from "./platforms";
 
-/** Provider-neutral shapes the rest of Postory works with. */
+/** Shapes the rest of Postory works with, whichever way an account is connected. */
+
+/** "nango" for OAuth connections held by Nango; "bluesky" for app-password connections. */
+export type ConnectionKind = "nango" | "bluesky";
 
 export type ProviderAccount = {
   externalId: string;
   platform: Platform;
   displayName: string | null;
-  externalProfileId: string | null;
   platformAccountId: string;
-  tokenExpiresAt: string | null;
-  /** The provider says this connection can't publish until it's reconnected. */
+  /** The connection can't publish until it's reconnected. */
   needsReconnect?: boolean;
   metadata: Record<string, unknown>;
 };
 
-export type ConnectDescriptor =
-  | { kind: "redirect"; url: string; availability: "stable" | "trial" | "pending"; newTab?: boolean }
-  /** A token for an in-page connect UI (Nango); the browser reports when it's done. */
-  | { kind: "session"; token: string; availability: "stable" | "trial" | "pending" }
-  | { kind: "credentials"; fields: { name: string; label: string; type: string }[]; availability: "stable" | "trial" | "pending" };
+export type Published = { postId: string; url: string | null };
 
-export type ProviderMedia = { kind: "image" | "video"; mediaId: string; altText?: string };
+/** Engagement on one published post. null = the network doesn't report that number. */
+export type PostMetrics = { impressions: number | null; reach: number | null; reactions: number | null; comments: number | null; reposts: number | null };
 
-export type PublishRequest = {
-  accountExternalId: string;
-  platform: Platform;
+/** One comment or reply on a post Postory published. */
+export type RemoteComment = {
+  id: string;
+  authorName: string | null;
+  authorHandle: string | null;
   text: string;
-  media: ProviderMedia[];
-  scheduledAt?: Date;
-  externalProfileId?: string | null;
-  idempotencyKey: string;
-  /** Short-lived public URLs, for providers that fetch media themselves. */
-  mediaUrls?: string[];
-  /** The provider's own name for the connected account type (e.g. Postiz "linkedin-page"). */
-  providerHint?: string;
-};
-
-export type ProviderPostStatus = "queued" | "validated" | "publishing" | "published" | "failed" | "rejected" | "canceled";
-
-export type PublishResult = {
-  status: ProviderPostStatus;
-  externalPostId: string | null;
-  platformPostId?: string | null;
-  batchId: string | null;
-  uri: string | null;
-  warnings: string[];
-  error: { code: string; message: string; remediation?: string; rule?: string } | null;
-};
-
-export type ProviderPost = {
-  externalPostId: string;
-  /** The network's own id for the post, when the provider reports it. */
-  platformPostId?: string | null;
-  status: ProviderPostStatus;
-  scheduledAt: string | null;
-  publishedAt: string | null;
-  uri: string | null;
-  error: { code: string; message: string } | null;
+  createdAt: string;
+  url: string | null;
+  /** Whatever the network needs to reply to it later (e.g. Bluesky's root/parent refs). */
+  context: Record<string, unknown>;
 };
 
 export class SocialProviderError extends Error {
@@ -65,11 +38,9 @@ export class SocialProviderError extends Error {
     message: string,
     public readonly options: {
       status?: number;
-      rule?: string;
       remediation?: string;
-      requestId?: string;
       platform?: string;
-      /** The provider may or may not have acted (timeout, 5xx). */
+      /** The network may or may not have acted (timeout, 5xx). */
       outcomeUnknown?: boolean;
       retryable?: boolean;
     } = {},

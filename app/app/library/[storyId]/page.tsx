@@ -41,7 +41,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
   const [data, entitlements, readiness, context, { data: accounts }] = await Promise.all([
     getStory(user.id, storyId),
     getEntitlements(user.id),
-    getSocialReadiness(user.id),
+    getSocialReadiness(),
     loadBusinessContext(user.id),
     supabase.from("social_accounts").select("id,platform,username,display_name").eq("user_id", user.id).eq("status", "connected"),
   ]);
@@ -52,7 +52,7 @@ export default async function StoryPage({ params, searchParams }: { params: Prom
   const corpus = factCorpus(context, story.source_text);
 
   const canPublish: PostCardContext["canPublish"] = !readiness.ready
-    ? { ok: false, reason: readiness.reason === "provider_not_configured" ? "Publishing isn't configured yet." : "Publishing workspace not linked yet." }
+    ? { ok: false, reason: "Publishing isn't configured yet." }
     : !entitlements.active
       ? { ok: false, reason: "Publishing needs a plan.", href: "/app/billing" }
       : { ok: true };

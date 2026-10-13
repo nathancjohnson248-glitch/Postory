@@ -115,7 +115,7 @@ export default function HowItWorksPage() {
         <ApprovalDemo />
       </Step>
 
-      <Step n="06" title="Postory publishes." body="Publish now or pick a time in your timezone. Scheduled posts are sent by the publisher, not a browser tab — and if a network fails, you're told which one and why.">
+      <Step n="06" title="Postory publishes." body="Publish now or pick a time in your timezone. Postory sends scheduled posts at their time, not a browser tab — and if a network fails, you're told which one and why.">
         <CalendarDemo />
       </Step>
 

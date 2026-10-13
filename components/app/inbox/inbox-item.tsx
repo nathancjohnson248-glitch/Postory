@@ -3,12 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink, Send } from "lucide-react";
 import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { draftInboxReply, markInboxReplied } from "@/app/_actions/inbox";
+import { draftInboxReply, markInboxReplied, sendInboxReplyAction } from "@/app/_actions/inbox";
+import { PLATFORM_META } from "@/lib/social/platforms";
 import type { Platform } from "@/lib/social/platforms";
 
 export type InboxItemView = {
@@ -35,6 +36,8 @@ export function InboxItem({ item, aiEnabled, when }: { item: InboxItemView; aiEn
   const [draft, setDraft] = useState(item.replyDraft ?? "");
   const [drafting, startDraft] = useTransition();
   const [marking, startMark] = useTransition();
+  const [sending, startSend] = useTransition();
+  const canSend = PLATFORM_META[item.platform]?.can.comments;
   const category = CATEGORY[item.category] ?? CATEGORY.needs_reply;
 
   return (
@@ -107,8 +110,28 @@ export function InboxItem({ item, aiEnabled, when }: { item: InboxItemView; aiEn
                   Open <ExternalLink className="size-3.5" />
                 </a>
               ) : null}
+              {canSend ? (
+                <Button
+                  size="sm"
+                  variant="accent"
+                  icon={<Send className="size-3.5" />}
+                  loading={sending}
+                  disabled={!draft.trim() || marking}
+                  onClick={() =>
+                    startSend(async () => {
+                      const result = await sendInboxReplyAction(item.id, draft);
+                      if (!result.ok) return void toast.error(result.error.message);
+                      toast.success(`Replied on ${PLATFORM_META[item.platform].name}.`);
+                      router.refresh();
+                    })
+                  }
+                >
+                  Send reply
+                </Button>
+              ) : null}
               <Button
                 size="sm"
+                variant={canSend ? "ghost" : "primary"}
                 icon={<Check className="size-3.5" />}
                 loading={marking}
                 onClick={() =>

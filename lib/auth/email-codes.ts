@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { headers } from "next/headers";
 import { env, integrations } from "@/lib/env";
 import { sendEmail } from "@/lib/email/send";
@@ -51,7 +51,10 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 
 async function originHash() {
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim();
+  // Cloudflare's header can't be set by the client; otherwise the right-most
+  // forwarded address is the one our own edge added (the left-most is whatever
+  // the client claimed).
+  const ip = h.get("cf-connecting-ip")?.trim() || h.get("x-forwarded-for")?.split(",").at(-1)?.trim() || h.get("x-real-ip")?.trim();
   return ip ? sha256(`ip:${ip}`) : null;
 }
 
@@ -278,6 +281,20 @@ export async function confirmWithoutEmail(email: string): Promise<boolean> {
   }
 }
 
+/**
+ * Record that the account holder proved they own the address (an emailed code
+ * or Google). Accounts without this mark may have been registered by someone
+ * else in "instant" mode, so their password is rotated the first time the
+ * real owner proves ownership (see signInWithVerifiedGoogle).
+ */
+export async function markEmailProven(userId: string) {
+  const admin = createAdminClient();
+  const { data } = await admin.auth.admin.getUserById(userId);
+  if (!data.user || data.user.app_metadata?.email_proven === true) return;
+  const { error } = await admin.auth.admin.updateUserById(userId, { app_metadata: { ...data.user.app_metadata, email_proven: true } });
+  if (error) log.warn("could not mark email proven", { operation: "auth.proven", userId }, error);
+}
+
 export type GoogleSignInOutcome = { status: "signed_in"; created: boolean } | { status: "failed" };
 
 /**
@@ -297,15 +314,27 @@ export async function signInWithVerifiedGoogle(input: { email: string; name: str
         email: input.email,
         email_confirm: true,
         user_metadata: input.name ? { full_name: input.name } : {},
-        app_metadata: { signup_method: "google" },
+        app_metadata: { signup_method: "google", email_proven: true },
       });
       // A concurrent sign-in may have created it a moment ago.
       if (error && error.code !== "email_exists" && error.code !== "user_already_exists") throw error;
       created = !error;
-    } else if (!existing.confirmed) {
-      // Google just proved ownership of the address.
-      const { error } = await admin.auth.admin.updateUserById(existing.userId, { email_confirm: true });
-      if (error) throw error;
+    } else {
+      // Google just proved ownership of the address. If nobody had proved it
+      // before (an unconfirmed sign-up, or one made while email codes were
+      // off), whoever registered it may not be this person: replace the
+      // password they chose so it can't be used to get back in.
+      const { data: found } = await admin.auth.admin.getUserById(existing.userId);
+      const proven = found.user?.app_metadata?.email_proven === true;
+      if (!existing.confirmed || !proven) {
+        const { error } = await admin.auth.admin.updateUserById(existing.userId, {
+          email_confirm: true,
+          password: randomBytes(32).toString("base64url"),
+          app_metadata: { ...(found.user?.app_metadata ?? {}), email_proven: true },
+        });
+        if (error) throw error;
+        log.info("unproven account claimed by google sign-in; password rotated", { operation: "auth.google.claim", userId: existing.userId });
+      }
     }
 
     const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email: input.email });

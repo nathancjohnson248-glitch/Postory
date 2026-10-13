@@ -32,45 +32,19 @@ export const env = {
   supabasePublishableKey: () => read("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
   supabaseSecretKey: () => read("SUPABASE_SECRET_KEY"),
 
-  letmepostApiKey: () => read("LETMEPOST_API_KEY"),
-  publoraApiKey: () => read("PUBLORA_API_KEY"),
-  postizApiKey: () => read("POSTIZ_API_KEY"),
+  // Nango holds OAuth tokens for X, LinkedIn, Threads, Instagram, Facebook and Pinterest.
   nangoSecretKey: () => read("NANGO_SECRET_KEY"),
-  /** Postiz Cloud by default; a self-hosted instance is https://your-domain/api/public/v1. */
-  postizApiUrl: () => (read("POSTIZ_API_URL") ?? "https://api.postiz.com/public/v1").replace(/\/+$/, ""),
-  letmepostBaseUrl: () => (read("LETMEPOST_API_BASE_URL") ?? "https://api.letmepost.dev").replace(/\/+$/, ""),
+  /** 32 random bytes, base64. Encrypts secrets Nango can't hold (Bluesky app passwords). */
+  credentialsKey: () => read("CREDENTIALS_KEY"),
 
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
   handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
-  // Gemini is Postory's model provider; OpenAI is only a fallback.
-  geminiApiKey: () => read("GEMINI_API_KEY"),
-  geminiModel: () => read("GEMINI_MODEL") ?? "gemini-3.5-flash",
-  geminiImageModel: () => read("GEMINI_IMAGE_MODEL") ?? "gemini-3.1-flash-image",
-
-  // Cloudflare Workers AI: post images.
-  cloudflareAccountId: () => read("CLOUDFLARE_ACCOUNT_ID"),
-  cloudflareAiToken: () => read("CLOUDFLARE_AI_TOKEN"),
-  cloudflareImageModel: () => read("CLOUDFLARE_IMAGE_MODEL") ?? "@cf/leonardo/lucid-origin",
-
-  // Groq: fast text fallback (OpenAI-compatible API). No images.
-  groqApiKey: () => read("GROQ_API_KEY"),
-  groqModel: () => read("GROQ_MODEL") ?? "openai/gpt-oss-120b",
   replicateApiToken: () => read("REPLICATE_API_TOKEN"),
-  /** Meta's Llama on Replicate (llama-3.3-70b-instruct isn't hosted there; Maverick is the current flagship). */
-  replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "meta/llama-4-maverick-instruct",
-  replicateFastModel: () => read("REPLICATE_FAST_MODEL") ?? "meta/llama-4-maverick-instruct",
+  // Replicate runs all of Postory's AI. Text models take prompt + system_prompt; see lib/ai/llm.ts.
+  replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "anthropic/claude-4.5-sonnet",
+  replicateFastModel: () => read("REPLICATE_FAST_MODEL") ?? "anthropic/claude-4.5-haiku",
   replicateImageModel: () => read("REPLICATE_IMAGE_MODEL") ?? "black-forest-labs/flux-1.1-pro",
-  openrouterApiKey: () => read("OPENROUTER_API_KEY"),
-  /** The writer: quality first. */
-  openrouterModel: () => read("OPENROUTER_MODEL") ?? "anthropic/claude-sonnet-5.5",
-  /** Quick checks (claim check): fast and cheap. */
-  openrouterFastModel: () => read("OPENROUTER_FAST_MODEL") ?? "anthropic/claude-haiku-5.5",
-  openrouterImageModel: () => read("OPENROUTER_IMAGE_MODEL") ?? "bytedance-seed/seedream-5-0-lite",
-
-  openaiApiKey: () => read("OPENAI_API_KEY"),
-  openaiModel: () => read("OPENAI_MODEL") ?? "gpt-5.4-mini",
-  openaiImageModel: () => read("OPENAI_IMAGE_MODEL") ?? "gpt-image-2",
 
   // Any SMTP mailbox (e.g. Zoho Mail: smtp.zoho.com, 465). Used when the Zoho API isn't set.
   smtpHost: () => read("SMTP_HOST"),
@@ -100,18 +74,10 @@ export const env = {
 export const integrations = {
   supabase: () => Boolean(env.supabaseUrl() && env.supabasePublishableKey()),
   supabaseAdmin: () => Boolean(env.supabaseUrl() && env.supabaseSecretKey()),
-  letmepost: () => Boolean(env.letmepostApiKey()),
-  publora: () => Boolean(env.publoraApiKey()),
-  postiz: () => Boolean(env.postizApiKey()),
   nango: () => Boolean(env.nangoSecretKey()),
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
-  gemini: () => Boolean(env.geminiApiKey()),
-  groq: () => Boolean(env.groqApiKey()),
-  openrouter: () => Boolean(env.openrouterApiKey()),
   replicate: () => Boolean(env.replicateApiToken()),
-  cloudflareAi: () => Boolean(env.cloudflareAccountId() && env.cloudflareAiToken()),
-  openai: () => Boolean(env.openaiApiKey()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
   zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
   /** Postory can send email from its own address (Zoho or SMTP). */
@@ -124,18 +90,10 @@ export function integrationStatus(): IntegrationStatus {
   return {
     supabase: integrations.supabase(),
     supabaseAdmin: integrations.supabaseAdmin(),
-    letmepost: integrations.letmepost(),
-    publora: integrations.publora(),
-    postiz: integrations.postiz(),
     nango: integrations.nango(),
     privy: integrations.privy(),
     handypay: integrations.handypay(),
-    gemini: integrations.gemini(),
-    groq: integrations.groq(),
-    openrouter: integrations.openrouter(),
     replicate: integrations.replicate(),
-    cloudflareAi: integrations.cloudflareAi(),
-    openai: integrations.openai(),
     smtp: integrations.smtp(),
     zoho: integrations.zoho(),
     email: integrations.email(),

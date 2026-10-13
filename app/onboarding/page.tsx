@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { NetworkList } from "@/components/app/network-list";
-import { connectsInPage, unavailablePlatforms } from "@/lib/social/availability";
 import { PlanCards } from "@/components/billing/plan-cards";
 import { TrialPicker } from "@/components/billing/trial-picker";
 import { StepRail } from "@/components/onboarding/step-rail";
@@ -19,7 +18,7 @@ import { aiAvailable } from "@/lib/ai/client";
 import { getEntitlements, previewGenerationsLeft } from "@/lib/entitlements";
 import { isPlatform, type Platform } from "@/lib/social/platforms";
 import { getNetworkStates } from "@/lib/data/social";
-import { getSocialReadiness } from "@/lib/social/service";
+import { getSocialReadiness, networkAvailability } from "@/lib/social/service";
 import { createClient } from "@/lib/supabase/server";
 import { firstName } from "@/lib/utils";
 
@@ -116,11 +115,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 }
 
 async function SocialStep({ userId }: { userId: string }) {
-  const [rows, readiness] = await Promise.all([getNetworkStates(userId), getSocialReadiness(userId)]);
+  const [rows, readiness] = await Promise.all([getNetworkStates(userId), getSocialReadiness()]);
   const connectedCount = rows.reduce((n, r) => n + r.accounts.filter((a) => a.status === "connected").length, 0);
   return (
     <div className="mx-auto max-w-2xl">
-      <NetworkList rows={rows} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} returnPath="/onboarding" unavailable={await unavailablePlatforms()} connectInPage={connectsInPage()} />
+      <NetworkList rows={rows} readiness={readiness.ready ? { ready: true } : { ready: false, message: readiness.message }} availability={await networkAvailability()} />
       <div className="mt-8 flex items-center justify-between">
         <BackButton to="voice" />
         <NextStepButton to="story" label={connectedCount ? "Continue" : "I'll connect later"} variant={connectedCount ? "primary" : "secondary"} />

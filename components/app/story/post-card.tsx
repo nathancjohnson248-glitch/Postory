@@ -467,7 +467,6 @@ function StatusActions({
   const meta = PLATFORM_META[post.platform];
   const disabled = busy !== null;
   const publishBlocked = !ctx.canPublish.ok ? ctx.canPublish.reason : blocked ? "Fix the issues above first." : !post.account ? `Choose a ${meta.name} account first.` : null;
-  const hasMedia = post.media.length > 0;
 
   switch (post.status) {
     case "draft":
@@ -502,8 +501,7 @@ function StatusActions({
               size="sm"
               variant="secondary"
               icon={<CalendarClock className="size-3.5" />}
-              disabled={disabled || Boolean(publishBlocked) || hasMedia}
-              title={hasMedia ? "Posts with media can't be scheduled through the publishing provider yet — publish now instead." : undefined}
+              disabled={disabled || Boolean(publishBlocked)}
               onClick={onSchedule}
             >
               Schedule

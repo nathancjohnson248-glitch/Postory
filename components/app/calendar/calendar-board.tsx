@@ -81,10 +81,6 @@ export function CalendarBoard({
     const source = existing ?? fromTray;
     if (!source) return;
     if (source.status !== "scheduled" && source.status !== "approved") return;
-    if (source.media.length && !existing) {
-      toast.error("Posts with media can't be scheduled through the publishing provider yet. Publish it now from its story.");
-      return;
-    }
     const time = source.scheduledFor ? timeKey(new Date(source.scheduledFor), timezone) : "09:00";
     const instant = zonedToUtc(day, time, timezone);
     if (tooSoon(instant)) {

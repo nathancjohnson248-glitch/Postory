@@ -1,8 +1,8 @@
 /**
- * Postory's network catalogue. Mirrors the platforms LetMePost publishes to
- * (see https://api.letmepost.dev OpenAPI `Platform` enum). Limits come from
- * LetMePost's documented preflight rules so Postory warns before the provider
- * rejects a post.
+ * Postory's network catalogue: limits, writing guidance, and what each
+ * network's own API lets Postory do. Capabilities are deliberately
+ * conservative: a feature is only on where the network's public API supports
+ * it for an app like Postory, so the UI never promises more than it can do.
  *
  * Safe to import from client and server code — contains no secrets.
  */
@@ -21,6 +21,12 @@ export type PlatformMeta = {
   voice: string;
   /** Extra caveat the UI should surface. */
   note?: string;
+  /** How an account is connected: Nango OAuth, a Bluesky app password, or not at all. */
+  connect: "nango" | "app_password" | "none";
+  /** What Postory can do with a connected account, per the network's API. */
+  can: { publish: boolean; metrics: boolean; comments: boolean };
+  /** Plain-language reason for anything above that's off. */
+  limitation?: string;
 };
 
 export const PLATFORM_META: Record<Platform, PlatformMeta> = {
@@ -30,6 +36,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 280,
     mediaRequired: "none",
     voice: "Punchy and compressed. Lead with the most striking concrete detail. Lowercase is fine if it fits the brand. No hashtag stuffing; at most one if any.",
+    connect: "nango",
+    can: { publish: true, metrics: true, comments: false },
+    limitation: "X charges apps to read replies, so X comments don't come into the inbox.",
   },
   linkedin: {
     id: "linkedin",
@@ -37,6 +46,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 3000,
     mediaRequired: "none",
     voice: "First-person, reflective, professional without corporate filler. Short paragraphs with line breaks. Explain why it matters. A closing line that invites conversation is fine.",
+    connect: "nango",
+    can: { publish: true, metrics: false, comments: false },
+    limitation: "LinkedIn only shares post stats and comments with its approved partner apps, so Postory can publish but not read them back.",
   },
   instagram: {
     id: "instagram",
@@ -45,6 +57,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     mediaRequired: "image_or_video",
     voice: "Visual-first caption. A bold opening line, then a few short lines. Energetic but genuine. A few relevant hashtags at the end are acceptable.",
     note: "Instagram requires an image or video.",
+    connect: "nango",
+    can: { publish: true, metrics: true, comments: true },
   },
   threads: {
     id: "threads",
@@ -52,6 +66,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 500,
     mediaRequired: "none",
     voice: "Conversational and casual, like talking to people who already follow you. Short.",
+    connect: "nango",
+    can: { publish: true, metrics: true, comments: true },
   },
   facebook: {
     id: "facebook",
@@ -59,6 +75,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 63206,
     mediaRequired: "none",
     voice: "Warm, community-oriented, plain language. A couple of short paragraphs.",
+    connect: "nango",
+    can: { publish: true, metrics: true, comments: true },
   },
   bluesky: {
     id: "bluesky",
@@ -66,6 +84,8 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     charLimit: 300,
     mediaRequired: "none",
     voice: "Candid and human, slightly nerdy. Short. No marketing speak.",
+    connect: "app_password",
+    can: { publish: true, metrics: true, comments: true },
   },
   pinterest: {
     id: "pinterest",
@@ -74,6 +94,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     mediaRequired: "image_or_video",
     voice: "Descriptive and searchable. Say what the image shows and why someone would save it.",
     note: "Every pin needs exactly one image or video.",
+    connect: "nango",
+    can: { publish: true, metrics: true, comments: false },
+    limitation: "Pinterest has no API for comments.",
   },
   tiktok: {
     id: "tiktok",
@@ -82,6 +105,9 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     mediaRequired: "video",
     voice: "Caption for a short video. Hooky first line, casual tone.",
     note: "TikTok needs a video, and the creator confirms the upload inside the TikTok app.",
+    connect: "none",
+    can: { publish: false, metrics: false, comments: false },
+    limitation: "TikTok only lets apps it has audited publish to accounts. Postory writes the caption; you post the video from TikTok.",
   },
 };
 
@@ -89,7 +115,7 @@ export function isPlatform(value: unknown): value is Platform {
   return typeof value === "string" && (PLATFORMS as readonly string[]).includes(value);
 }
 
-/** Grapheme-aware length, matching how LetMePost and the networks count. */
+/** Grapheme-aware length, matching how the networks count. */
 export function countCharacters(text: string): number {
   if (typeof Intl !== "undefined" && "Segmenter" in Intl) {
     const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });

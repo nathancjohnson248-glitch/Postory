@@ -25,7 +25,7 @@ const QUESTIONS = [
   },
   {
     q: "Which social networks can I connect?",
-    a: "X, LinkedIn, Instagram, Threads, Facebook, Bluesky, TikTok and Pinterest. You connect each account through the network's own sign-in — Postory never asks for your passwords. Instagram needs an image, TikTok needs a video.",
+    a: "Postory publishes to X, LinkedIn, Instagram, Threads, Facebook, Pinterest and Bluesky. You connect each through the network's own sign-in (Bluesky uses an app password), so Postory never sees your password. It also writes TikTok captions, but TikTok only lets audited apps publish, so you post those yourself.",
   },
   {
     q: "Does Postory generate images?",

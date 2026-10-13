@@ -5,6 +5,17 @@ export const metadata: Metadata = { title: "Changelog", description: "What's new
 
 const ENTRIES = [
   {
+    date: "October 13, 2026",
+    title: "Your networks, read back",
+    items: [
+      "Connect X, LinkedIn, Instagram, Threads, Facebook and Pinterest on the network's own sign-in screen, and Bluesky with an app password",
+      "Engagement on published posts, read back from each network that shares it",
+      "Inbox: comments on your Instagram, Threads, Facebook and Bluesky posts, with replies Postory drafts and you send",
+      "Plan: Postory suggests what's worth posting next from your stories and memory, and asks when it needs a real detail",
+      "Scheduled posts can carry images",
+    ],
+  },
+  {
     date: "October 11, 2026",
     title: "Postory, rebuilt",
     items: [
@@ -18,9 +29,9 @@ const ENTRIES = [
 ];
 
 const ROADMAP = [
-  "Comments and replies in the inbox as networks make them available",
-  "Engagement analytics from each network",
-  "Scheduling posts with images and video",
+  "Video posts",
+  "TikTok publishing, once TikTok approves Postory's app",
+  "Agent access: let Claude Code or Cursor draft stories for you to approve",
   "Team members and approvals",
 ];
 

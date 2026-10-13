@@ -15,11 +15,11 @@ const FEATURES = [
   { icon: PenLine, title: "Stories", body: "Capture what happened — typed, pasted or dictated. Each story keeps its posts together, so one event reads as one thing." },
   { icon: Brain, title: "Platform-native writing", body: "A distinct version for each network, written for how that network reads. Adjust any one of them in plain language without touching the rest." },
   { icon: CheckCheck, title: "Approval first", body: "Everything lands in review. Approve, edit, regenerate, reject — or approve all at once. Nothing publishes on its own." },
-  { icon: CalendarDays, title: "Scheduling & calendar", body: "Schedule in your timezone, see the month at a glance, drag to move. Scheduled posts are executed by the publisher, not a browser tab." },
+  { icon: CalendarDays, title: "Scheduling & calendar", body: "Schedule in your timezone, see the month at a glance, drag to move. Postory sends scheduled posts at their time; your browser doesn't need to be open." },
   { icon: ShieldCheck, title: "Facts stay facts", body: "Postory only uses your story and business memory. Numbers are kept exactly; anything it can't trace back to you is flagged before you approve." },
   { icon: Inbox, title: "Inbox", body: "A short list of conversations worth answering, with drafted replies you approve. On Pro and Max, where your networks make it available." },
   { icon: LineChart, title: "Analytics", body: "What went out, where, and which stories travelled furthest — in sentences first. Only real numbers; nothing estimated." },
-  { icon: Plug, title: "Real connections", body: "Accounts connect through each network's own consent screen via our publishing provider. Postory never sees your passwords." },
+  { icon: Plug, title: "Real connections", body: "Accounts connect through each network's own consent screen. Postory never sees your passwords, and tokens are held by Nango, a dedicated OAuth service." },
 ];
 
 export default function FeaturesPage() {
@@ -55,7 +55,7 @@ export default function FeaturesPage() {
       <section id="integrations" className="mx-auto max-w-7xl scroll-mt-20 px-5 py-24 sm:px-8">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
           {[
-            ["Publishing", "Posts are published and scheduled through Postory's publishing partner, with checks before sending and idempotent requests so a retry never posts twice."],
+            ["Publishing", "Posts go straight to each network's own API, checked against its limits first. Each post is locked while it sends, so a double click or a retry can never post it twice."],
             ["Billing", "Subscriptions run on HandyPay's hosted checkout. Card details never touch Postory."],
             ["Your data", "Stories, posts and memory live in a database where every row is locked to its owner. Delete your account and it's gone."],
           ].map(([t, b]) => (

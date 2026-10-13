@@ -39,10 +39,10 @@ function networkName(platform?: string) {
   return platform && isPlatform(platform) ? PLATFORM_META[platform].name : "The network";
 }
 
-/** Translate a LetMePost error code into something a business owner can act on. */
+/** Translate a network error code into something a business owner can act on. */
 export function describeSocialError(
   code: string,
-  context: { platform?: string; message?: string; remediation?: string; operation?: "connect" | "publish" | "schedule" | "sync" } = {},
+  context: { platform?: string; message?: string; remediation?: string; operation?: "connect" | "publish" | "schedule" | "sync"; outcomeUnknown?: boolean } = {},
 ): ActionError {
   const name = networkName(context.platform);
   const remediation = context.remediation ? ` ${context.remediation}` : "";
@@ -55,37 +55,36 @@ export function describeSocialError(
       };
     case "platform_rejected":
       return { code, message: `${name} rejected this post.${remediation || " Check the content and try again."}` };
-    case "preflight_failed":
-    case "validation_failed":
-      return { code, message: `${context.message ?? `${name} won't accept this post as written.`}${remediation}` };
     case "rate_limited":
-      return { code, message: `${name} is limiting how often you can post right now. Wait a few minutes and try again.` };
+      return { code, message: `${name} is limiting how often Postory can post right now. Wait a few minutes and try again.` };
     case "platform_unavailable":
-      return { code, message: `${name} is having trouble right now. Nothing was published. Try again shortly.` };
+      return context.outcomeUnknown
+        ? { code: "outcome_unknown", message: `${name} had a problem mid-request, so Postory can't tell whether it posted. Check ${name} before retrying.` }
+        : { code, message: `${name} is having trouble right now. Nothing was published. Try again shortly.` };
     case "platform_not_enabled":
-      return { code, message: `${name} isn't available through Postory's publishing provider yet.` };
+      return { code, message: context.message ?? `Postory can't do that on ${name} yet.` };
+    case "media_required":
+    case "media_too_large":
+    case "media_unavailable":
+      return { code, message: context.message ?? `${name} couldn't take the image on this post.` };
     case "timeout":
     case "network_error":
-      return {
-        code,
-        message:
-          context.operation === "publish" || context.operation === "schedule"
-            ? `We couldn't confirm the result with ${name}. Retrying is safe — Postory won't post twice.`
-            : "Postory couldn't reach its publishing provider. Try again in a moment.",
-      };
+      return context.outcomeUnknown || context.operation === "publish"
+        ? { code: "outcome_unknown", message: `Postory couldn't get an answer from ${name}, so it can't tell whether it posted. Check ${name} before retrying, so it doesn't post twice.` }
+        : { code, message: `Postory couldn't reach ${name}. Try again in a moment.` };
     case "unauthenticated":
     case "unauthorized":
       return context.operation === "connect"
-        ? {
-            code: "connect_not_permitted",
-            message:
-              "LetMePost didn't let Postory start this connection. LetMePost currently only allows new accounts to be connected from its own dashboard, so in-app connections aren't available yet.",
-          }
-        : { code, message: "Postory's publishing provider rejected its credentials. This is on our side — we've logged it." };
+        ? { code: "connect_not_permitted", message: `${name} didn't let Postory connect. Make sure you approve every permission on ${name}'s screen, then try again.` }
+        : {
+            code,
+            message: `${name} refused this request. The connection may be missing a permission. Reconnect ${name} and approve every permission.`,
+            action: { label: `Reconnect ${name}`, href: "/app/connections" },
+          };
     case "not_found":
       return { code, message: `${name} couldn't find that account or post. It may have been removed. Reconnect and try again.` };
-    case "idempotency_conflict":
-      return { code, message: "This post is already being processed. Refresh in a moment to see the result." };
+    case "unexpected_response":
+      return { code, message: `${name} answered in a way Postory didn't expect, so it can't tell whether it worked. Check ${name} before retrying.` };
     default:
       return { code: code || "unknown_error", message: context.message ? `${context.message}${remediation}` : "Something went wrong. Try again." };
   }

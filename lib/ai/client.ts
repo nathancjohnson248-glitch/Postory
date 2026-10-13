@@ -2,7 +2,7 @@ import "server-only";
 
 import { llmProvider } from "./llm";
 
-/** Whether any model provider (Gemini, or OpenAI as a fallback) is configured. */
+/** Whether Postory's AI (Replicate) is configured. */
 export function aiAvailable() {
   return llmProvider() !== null;
 }

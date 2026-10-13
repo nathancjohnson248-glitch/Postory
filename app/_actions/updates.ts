@@ -30,12 +30,13 @@ export async function sendProductUpdate(input: ProductUpdateInput & { mode: "tes
   return runAction("updates.send", async (user) => {
     if ((await getAdminRole(user)) !== "owner") throw new UserFacingError("forbidden", "Only the owner can send product updates.");
     if (!integrations.email()) throw new UserFacingError("not_configured", "No email sender is configured on this deployment.");
+    const mode = z.enum(["test", "all"]).parse(input.mode);
     const parsed = UpdateSchema.safeParse(input);
     if (!parsed.success) throw new UserFacingError("invalid", parsed.error.issues[0]?.message ?? "Check the update.");
     const { ctaLabel, ctaUrl, ...rest } = parsed.data;
     const content = { ...rest, ...(ctaLabel && ctaUrl ? { ctaLabel, ctaUrl } : {}) };
 
-    if (input.mode === "test") {
+    if (mode === "test") {
       const result = await sendEmail(user.email, "productUpdate", content);
       if (!result.sent) throw new UserFacingError("send_failed", "The test email didn't send. Check the email sender in Railway.");
       return { sent: 1, failed: 0, to: user.email };

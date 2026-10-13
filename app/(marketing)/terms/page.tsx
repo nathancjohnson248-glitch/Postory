@@ -18,7 +18,7 @@ export default function TermsPage() {
         <h2>AI-assisted drafts</h2>
         <p>Postory can draft posts with AI. Drafts can contain mistakes, so every post waits for your review. You decide what is published.</p>
         <h2>Connected accounts</h2>
-        <p>Connections are made through each network&apos;s own authorization, via our publishing provider. Networks can change or limit their APIs; when that happens a feature may stop working for that network until it can be restored.</p>
+        <p>Connections are made through each network&apos;s own authorization (Bluesky uses an app password you create). Networks can change or limit their APIs; when that happens a feature may stop working for that network until it can be restored.</p>
         <h2>Plans, trials and billing</h2>
         <p>Paid plans are billed monthly through HandyPay. New customers get a {TRIAL_DAYS}-day trial; if you don&apos;t cancel before it ends, your plan begins and you&apos;re charged. You can cancel any time — access continues until the end of the paid period. Plan changes start a new subscription for the new plan and end the previous one; unused time is not prorated or refunded unless required by law. Plan limits (such as AI generations) reset each billing period.</p>
         <h2>Acceptable use</h2>
