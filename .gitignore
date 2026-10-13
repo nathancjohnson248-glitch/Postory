@@ -39,3 +39,4 @@ next-env.d.ts
 # supabase cli
 supabase/.branches
 supabase/.temp
+.studio-test/
