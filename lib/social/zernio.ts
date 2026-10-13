@@ -80,6 +80,11 @@ async function request(path: string, options: Options = {}): Promise<Raw> {
   log.warn("zernio error response", { operation, provider: "zernio", status: res.status, code: errorCode(body) });
   // 401 here means Postory's own key was refused, not the customer's account.
   if (res.status === 401) throw new SocialProviderError("provider_unavailable", "Postory's connection service isn't accepting requests right now. Try again soon.", { status: 401 });
+  // Billing on Postory's Zernio account (e.g. X needs a card on file): the owner's to fix, never the customer's.
+  if (res.status === 402) {
+    log.error("zernio needs a payment method", { operation, provider: "zernio", status: 402, code: errorCode(body) });
+    throw new SocialProviderError("platform_not_enabled", "This network is being set up. Your other networks work as normal.", { status: 402 });
+  }
   throw new SocialProviderError(mapStatus(res.status), message, {
     status: res.status,
     retryable: res.status >= 500 || res.status === 429,
