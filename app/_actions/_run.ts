@@ -12,9 +12,9 @@ import { log } from "@/lib/log";
 import { InvalidTransitionError } from "@/lib/posts/state-machine";
 
 export function toFailure(error: unknown, operation: string, userId?: string): ReturnType<typeof fail> {
-  if (error instanceof UserFacingError) return fail(error.code, error.message, error.action);
+  if (error instanceof UserFacingError) return fail(error.code, error.message, error.action, error.upgrade);
   if (error instanceof EntitlementError) {
-    return fail(error.code, error.message, { label: error.code === "no_plan" ? "Choose a plan" : "See plans", href: "/app/billing" });
+    return fail(error.code, error.message, { label: error.code === "no_plan" ? "Choose a plan" : "See plans", href: "/app/billing" }, error.upgrade);
   }
   if (error instanceof InvalidTransitionError) return fail("invalid_state", error.message);
   if (error instanceof BillingUnavailableError) return fail(`billing_${error.code}`, error.message);

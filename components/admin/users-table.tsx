@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Search, ShieldCheck, ShieldOff } from "lucide-react";
@@ -160,7 +161,7 @@ export function UsersTable({ users, canManage, viewerId }: { users: AdminUser[];
                         onConfirm={async () => {
                           const result = await revokeAdmin(user.id);
                           if (result.ok) toast.success("Admin access removed.");
-                          else toast.error(result.error.message);
+                          else showError(result.error);
                         }}
                       >
                         Remove admin
@@ -178,7 +179,7 @@ export function UsersTable({ users, canManage, viewerId }: { users: AdminUser[];
                         onConfirm={async () => {
                           const result = await promoteToAdmin(user.id);
                           if (result.ok) toast.success(`${user.email} is now an admin.`);
-                          else toast.error(result.error.message);
+                          else showError(result.error);
                         }}
                       >
                         Make admin

@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -118,6 +119,7 @@ export function Composer({
             textarea.current?.focus();
             return;
           } else if (event.type === "error") {
+            if (event.error?.upgrade) showError(event.error);
             throw event.error;
           }
         }

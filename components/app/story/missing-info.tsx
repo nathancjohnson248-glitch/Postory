@@ -1,7 +1,7 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useState, useTransition } from "react";
-import { toast } from "sonner";
 import { Check, Plus } from "lucide-react";
 import { addMemory } from "@/app/_actions/memory";
 
@@ -41,7 +41,7 @@ function Question({ question }: { question: string }) {
             start(async () => {
               const result = await addMemory({ category: "facts", key: question.slice(0, 100), value: answer.trim(), source: "story" });
               if (result.ok) setSaved(true);
-              else toast.error(result.error.message);
+              else showError(result.error);
             });
           }}
         >

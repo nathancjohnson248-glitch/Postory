@@ -153,6 +153,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          email_hash: string
+          expires_at: string
+          id: string
+          purpose: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          email_hash: string
+          expires_at: string
+          id?: string
+          purpose: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          email_hash?: string
+          expires_at?: string
+          id?: string
+          purpose?: string
+        }
+        Relationships: []
+      }
       inbox_items: {
         Row: {
           author_handle: string | null

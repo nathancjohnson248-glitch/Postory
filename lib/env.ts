@@ -48,7 +48,12 @@ export const env = {
   aiTextModel: () => read("AI_TEXT_MODEL") ?? "",
   aiTextFastModel: () => read("AI_TEXT_FAST_MODEL") ?? read("AI_TEXT_MODEL") ?? "",
   aiTextMaxTokens: () => Number(read("AI_TEXT_MAX_TOKENS") ?? 4000),
-  // Replicate makes images only.
+  // Images: any OpenAI-compatible /images/generations API (Pollinations by
+  // default); Replicate is the fallback when it isn't configured.
+  aiImageBaseUrl: () => read("AI_IMAGE_BASE_URL")?.replace(/\/+$/, ""),
+  aiImageApiKey: () => read("AI_IMAGE_API_KEY"),
+  aiImageModel: () => read("AI_IMAGE_MODEL") ?? "microsoft/mai-image-2.6-flash",
+  // Replicate: image fallback.
   replicateApiToken: () => read("REPLICATE_API_TOKEN"),
   replicateImageModel: () => read("REPLICATE_IMAGE_MODEL") ?? "black-forest-labs/flux-1.1-pro",
 
@@ -85,6 +90,7 @@ export const integrations = {
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   replicate: () => Boolean(env.replicateApiToken()),
+  aiImage: () => Boolean(env.aiImageBaseUrl() && env.aiImageApiKey()),
   aiText: () => Boolean(env.aiTextBaseUrl() && env.aiTextApiKey() && env.aiTextModel()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
   zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
@@ -103,6 +109,7 @@ export function integrationStatus(): IntegrationStatus {
     handypay: integrations.handypay(),
     replicate: integrations.replicate(),
     aiText: integrations.aiText(),
+    aiImage: integrations.aiImage(),
     smtp: integrations.smtp(),
     zoho: integrations.zoho(),
     email: integrations.email(),

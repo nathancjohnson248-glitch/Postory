@@ -1,7 +1,7 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PlanCards } from "./plan-cards";
 import { startPlanCheckout } from "@/app/_actions/billing";
@@ -16,7 +16,7 @@ export function PlanPicker({ returnPath, trialEligible }: { returnPath: "/onboar
     const result = await startPlanCheckout(plan, returnPath);
     if (!result.ok) {
       setPending(null);
-      toast.error(result.error.message);
+      showError(result.error);
       return;
     }
     window.location.assign(result.data.url);

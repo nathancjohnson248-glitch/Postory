@@ -105,10 +105,18 @@ async function assertCanConnect(userId: string) {
   // Before a plan is chosen (during onboarding) allow up to the Solo allowance.
   const allowed = entitlements.active ? canConnectAnotherAccount(entitlements, existing.length) : existing.length < (PLANS.solo.limits.socialAccounts ?? 0);
   if (!allowed) {
+    const next = entitlements.plan === "solo" ? PLANS.pro : entitlements.plan === "pro" ? PLANS.max : entitlements.plan ? null : PLANS.solo;
+    const limit = entitlements.limits.socialAccounts ?? PLANS.solo.limits.socialAccounts;
     throw new UserFacingError(
       "account_limit",
-      `Your plan includes ${entitlements.limits.socialAccounts ?? PLANS.solo.limits.socialAccounts} connected accounts. Upgrade to connect more.`,
+      `Your plan includes ${limit} connected accounts. Upgrade to connect more.`,
       { label: "See plans", href: "/app/billing" },
+      {
+        title: `You've connected all ${limit} accounts your plan includes`,
+        body: "Disconnect one you no longer post to, or upgrade to connect more.",
+        currentPlan: entitlements.plan ? PLANS[entitlements.plan].name : null,
+        next: next ? { id: next.id, name: next.name, offer: `${next.limits.socialAccounts === null ? "Unlimited" : next.limits.socialAccounts} connected accounts, $${next.priceMonthlyUsd}/month` } : null,
+      },
     );
   }
 }

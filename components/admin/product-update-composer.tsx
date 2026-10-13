@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useState, useTransition } from "react";
 import { Send } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +24,7 @@ export function ProductUpdateComposer({ recipients, ownerEmail }: { recipients: 
   function test() {
     startTest(async () => {
       const result = await sendProductUpdate({ ...draft, mode: "test" });
-      if (!result.ok) return void toast.error(result.error.message);
+      if (!result.ok) return void showError(result.error);
       setTested(true);
       toast.success(`Test sent to ${ownerEmail}. Check how it looks, then send it to everyone.`);
     });
@@ -31,7 +32,7 @@ export function ProductUpdateComposer({ recipients, ownerEmail }: { recipients: 
 
   async function sendAll() {
     const result = await sendProductUpdate({ ...draft, mode: "all" });
-    if (!result.ok) return void toast.error(result.error.message);
+    if (!result.ok) return void showError(result.error);
     const { sent, failed } = result.data;
     if (failed) toast.warning(`Sent to ${sent}. ${failed} didn't go through. The sender may be rate-limited, so try those again later.`, { duration: 10_000 });
     else toast.success(`Sent to ${sent} ${sent === 1 ? "person" : "people"}.`);

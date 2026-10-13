@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
@@ -83,7 +84,7 @@ export function NetworkList({
   async function disconnect(accountId: string, platform: Platform) {
     const result = await disconnectNetwork(accountId);
     if (!result.ok) {
-      toast.error(result.error.message);
+      showError(result.error);
       return;
     }
     toast.success(
@@ -202,7 +203,7 @@ export function NetworkList({
                 if (result.ok) {
                   toast.success("Accounts refreshed.");
                   router.refresh();
-                } else toast.error(result.error.message);
+                } else showError(result.error);
               })
             }
           >

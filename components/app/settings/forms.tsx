@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ import { PLATFORMS, PLATFORM_META, type Platform } from "@/lib/social/platforms"
 import { BUSINESS_TYPES, VOICE_PRESETS } from "@/lib/validation/schemas";
 import { cn } from "@/lib/utils";
 
-type Result = { ok: true } | { ok: false; error: { message: string } };
+type Result = { ok: true } | { ok: false; error: import("@/lib/errors").ActionError };
 
 function listTimeZones(fallback: string): string[] {
   try {
@@ -41,7 +42,7 @@ function useSave() {
       if (result.ok) {
         toast.success(message);
         router.refresh();
-      } else toast.error(result.error.message);
+      } else showError(result.error);
     });
   return { pending, save };
 }

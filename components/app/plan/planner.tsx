@@ -1,10 +1,10 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, HelpCircle, RefreshCw } from "lucide-react";
-import { toast } from "sonner";
 import { generatePlanAction } from "@/app/_actions/plan";
 import { LogoMark } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
@@ -32,7 +32,7 @@ export function Planner({ initial, generatedAt, horizon, enabled }: { initial: P
     start(async () => {
       const result = await generatePlanAction();
       clearInterval(timer);
-      if (!result.ok) return void toast.error(result.error.message);
+      if (!result.ok) return void showError(result.error);
       setPlan(result.data);
       setWhen("just now");
     });

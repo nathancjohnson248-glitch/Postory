@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { toFailure } from "@/app/_actions/_run";
+import type { ActionError } from "@/lib/errors";
 import { aiAvailable } from "@/lib/ai/client";
 import { factCorpus, loadBusinessContext } from "@/lib/ai/context";
 import { generatePosts } from "@/lib/ai/generate-posts";
@@ -28,7 +29,7 @@ type Event =
   | { type: "stage"; stage: "understanding" | "writing" | "checking" | "saving" }
   | { type: "done"; storyId: string; posts: number; missingPlatforms: string[] }
   | { type: "needs_detail"; questions: string[] }
-  | { type: "error"; error: { code: string; message: string; action?: { label: string; href: string } } };
+  | { type: "error"; error: ActionError };
 
 /**
  * Turn a story into platform posts. Streams newline-delimited JSON events

@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -98,7 +99,7 @@ export function CalendarBoard({
     const result = await action({ postId, scheduledFor: iso });
     if (!result.ok) {
       setPosts(previous);
-      toast.error(result.error.message);
+      showError(result.error);
       return;
     }
     toast.success(`${existing ? "Moved" : "Scheduled"} to ${formatInZone(instant, timezone, { weekday: "short", month: "short", day: "numeric" })}, ${formatTime(instant, timezone)}.`);
@@ -286,7 +287,7 @@ export function CalendarBoard({
                     onConfirm={async () => {
                       const result = await unschedulePostAction(open.id);
                       if (!result.ok) {
-                        toast.error(result.error.message);
+                        showError(result.error);
                         return;
                       }
                       setPosts((cur) => cur.filter((p) => p.id !== open.id));

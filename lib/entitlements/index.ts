@@ -5,7 +5,8 @@ import { env } from "@/lib/env";
 import { log } from "@/lib/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { METRIC_LABEL, METRIC_LIMIT_KEY, type UsageMetric } from "@/lib/billing/plans";
+import { METRIC_LABEL, METRIC_LIMIT_KEY, PLANS, type PlanId, type UsageMetric } from "@/lib/billing/plans";
+import type { Upgrade } from "@/lib/errors";
 import { needsSync, syncSubscription } from "@/lib/billing/service";
 import { isOwnerEmail } from "@/lib/auth/admin";
 import { resolveEntitlements, type Entitlements } from "./resolve";
@@ -40,10 +41,43 @@ export class EntitlementError extends Error {
   constructor(
     public readonly code: "no_plan" | "limit_reached" | "feature_unavailable",
     message: string,
+    public readonly upgrade?: Upgrade,
   ) {
     super(message);
     this.name = "EntitlementError";
   }
+}
+
+const ORDER: PlanId[] = ["solo", "pro", "max"];
+
+function nextPlan(plan: PlanId | null) {
+  const id = plan ? ORDER[ORDER.indexOf(plan) + 1] : "solo";
+  return id ? PLANS[id] : null;
+}
+
+/** The upgrade modal's content for a used-up metric, from the real plan limits. */
+export function limitUpgrade(entitlements: Entitlements, metric: UsageMetric): Upgrade {
+  const key = METRIC_LIMIT_KEY[metric];
+  const label = METRIC_LABEL[metric];
+  const current = entitlements.plan ? PLANS[entitlements.plan] : null;
+  const next = nextPlan(entitlements.plan);
+  return {
+    title: `You've used all your ${label} for this period`,
+    body: `${current ? `${current.name} includes ${entitlements.limits[key]} ${label} each billing period.` : ""} They come back when your next period starts${next ? `, or straight away if you upgrade` : ""}.`.trim(),
+    currentPlan: current?.name ?? null,
+    next: next ? { id: next.id, name: next.name, offer: `${next.limits[key]} ${label} a period, $${next.priceMonthlyUsd}/month` } : null,
+  };
+}
+
+/** The upgrade modal's content for a feature the current plan doesn't include. */
+export function featureUpgrade(entitlements: Entitlements, label: string): Upgrade {
+  const next = nextPlan(entitlements.plan);
+  return {
+    title: `${label} comes with ${next?.name ?? "Pro"}`,
+    body: `${label} isn't part of ${entitlements.plan ? PLANS[entitlements.plan].name : "your plan"}.`,
+    currentPlan: entitlements.plan ? PLANS[entitlements.plan].name : null,
+    next: next ? { id: next.id, name: next.name, offer: `${label}, plus ${next.limits.aiGenerations} AI post generations a period, $${next.priceMonthlyUsd}/month` } : null,
+  };
 }
 
 export function assertActivePlan(entitlements: Entitlements) {
@@ -60,7 +94,7 @@ export function assertActivePlan(entitlements: Entitlements) {
 export function assertFeature(entitlements: Entitlements, feature: keyof Entitlements["features"], label: string) {
   assertActivePlan(entitlements);
   if (!entitlements.features[feature]) {
-    throw new EntitlementError("feature_unavailable", `${label} is available on Pro and Max.`);
+    throw new EntitlementError("feature_unavailable", `${label} is available on Pro and Max.`, featureUpgrade(entitlements, label));
   }
 }
 
@@ -88,6 +122,7 @@ export async function consumeUsage(userId: string, entitlements: Entitlements, m
     throw new EntitlementError(
       "limit_reached",
       `You've used all ${limit} ${METRIC_LABEL[metric]} for this period. Upgrade for more, or wait for your next billing period.`,
+      limitUpgrade(entitlements, metric),
     );
   }
   return {

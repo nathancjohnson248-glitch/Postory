@@ -14,7 +14,8 @@ import { log } from "@/lib/log";
  *           AI_TEXT_API_KEY
  *           AI_TEXT_MODEL      the writer
  *           AI_TEXT_FAST_MODEL quick checks (defaults to AI_TEXT_MODEL)
- *   images  Replicate only: REPLICATE_API_TOKEN, REPLICATE_IMAGE_MODEL (FLUX 1.1 Pro)
+ *   images  any OpenAI-compatible images API (AI_IMAGE_BASE_URL, AI_IMAGE_API_KEY,
+ *           AI_IMAGE_MODEL), with Replicate (REPLICATE_API_TOKEN) as the fallback
  *
  * Every text call puts the JSON Schema in the instructions, extracts the
  * object from the answer, and validates it with zod. A malformed answer is
@@ -39,7 +40,7 @@ export function llmProvider(): "text" | null {
 }
 
 export function imageAvailable() {
-  return integrations.replicate();
+  return integrations.aiImage() || integrations.replicate();
 }
 
 const SAVED = "Anything you wrote is saved, so try again in a few minutes.";
@@ -289,8 +290,70 @@ type ImageResult = { bytes: Buffer; contentType: string; extension: string };
 
 const ASPECT: Record<ImageShape, string> = { square: "1:1", portrait: "4:5", landscape: "16:9" };
 
-/** One image for a post, from Replicate's image model, downloaded so Postory can store it. */
+const SIZE: Record<ImageShape, string> = { square: "1024x1024", portrait: "1024x1280", landscape: "1536x864" };
+
+/** POST {base}/images/generations (OpenAI shape). Returns the image bytes. */
+async function imageViaApi(prompt: string, shape: ImageShape): Promise<ImageResult> {
+  const base = env.aiImageBaseUrl()!;
+  const model = env.aiImageModel();
+  let res: Response;
+  try {
+    res = await fetch(`${base}/images/generations`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.aiImageApiKey()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt: prompt.slice(0, 3000), size: SIZE[shape], n: 1, response_format: "b64_json" }),
+      signal: AbortSignal.timeout(150_000),
+      cache: "no-store",
+    });
+  } catch (error) {
+    log.warn("image request failed", { operation: "ai.image", provider: base, model }, error);
+    throw new LlmError("provider_error", "Image generation didn't respond. Nothing was lost, so try again.");
+  }
+  const data = (await res.json().catch(() => ({}))) as { data?: { b64_json?: string; url?: string }[]; error?: { message?: string; code?: string } };
+  if (!res.ok) {
+    log.warn("image error response", { operation: "ai.image", provider: base, model, status: res.status, code: data.error?.code });
+    if (res.status === 401 || res.status === 402 || res.status === 403 || res.status === 404) {
+      alertOwner(`image-${res.status}`, {
+        title: res.status === 402 ? "The image provider is out of credit" : "The image provider refused Postory's request",
+        body: `${base} answered ${res.status} for ${model}. Top up the account, or check AI_IMAGE_API_KEY / AI_IMAGE_MODEL in Railway.`,
+        actionLabel: "Open Railway",
+        actionUrl: "https://railway.com/dashboard",
+      });
+      throw new LlmError("unavailable", `Image generation couldn't run just now. ${SAVED}`);
+    }
+    if (res.status === 400 && /safety|content|policy|moderation/i.test(`${data.error?.code} ${data.error?.message}`)) {
+      throw new LlmError("refused", "That image request was declined by the model's safety filter. Try a different description.");
+    }
+    if (res.status === 429) throw new LlmError("provider_error", "Image generation is busy. Try again in a minute.");
+    throw new LlmError("provider_error", "Image generation hit a problem. Nothing was lost, so try again.");
+  }
+  const item = data.data?.[0];
+  let bytes: Buffer | null = null;
+  if (item?.b64_json) bytes = Buffer.from(item.b64_json, "base64");
+  else if (item?.url?.startsWith("https://")) {
+    const file = await fetch(item.url, { signal: AbortSignal.timeout(60_000), cache: "no-store" }).catch(() => null);
+    if (file?.ok) bytes = Buffer.from(await file.arrayBuffer());
+  }
+  return checkedImage(bytes);
+}
+
+/** Never hand back a broken file as a finished asset: check it's a real JPEG/PNG/WebP of a sensible size. */
+function checkedImage(bytes: Buffer | null): ImageResult {
+  if (!bytes || bytes.length < 5_000) throw new LlmError("invalid_output", "The image came back broken. Try again.");
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return { bytes, contentType: "image/jpeg", extension: "jpg" };
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) return { bytes, contentType: "image/png", extension: "png" };
+  if (bytes.subarray(8, 12).toString() === "WEBP") return { bytes, contentType: "image/webp", extension: "webp" };
+  throw new LlmError("invalid_output", "The image came back in a format Postory can't use. Try again.");
+}
+
+/** One image for a post: the images API when configured, otherwise Replicate. Downloaded so Postory can store it. */
 export async function generateImageBytes(prompt: string, shape: ImageShape): Promise<ImageResult> {
+  if (integrations.aiImage()) return imageViaApi(prompt, shape);
+  return imageViaReplicate(prompt, shape);
+}
+
+/** Replicate's image model. */
+async function imageViaReplicate(prompt: string, shape: ImageShape): Promise<ImageResult> {
   if (!integrations.replicate()) throw new LlmError("unavailable", "Image generation isn't set up on this deployment yet.");
   const output = await predict(
     env.replicateImageModel(),
@@ -301,6 +364,5 @@ export async function generateImageBytes(prompt: string, shape: ImageShape): Pro
   if (typeof url !== "string" || !url.startsWith("https://")) throw new LlmError("invalid_output", "No image came back. Try again.");
   const file = await fetch(url, { signal: AbortSignal.timeout(60_000), cache: "no-store" }).catch(() => null);
   if (!file?.ok) throw new LlmError("provider_error", "The image was made but couldn't be downloaded. Try again.");
-  const contentType = file.headers.get("content-type")?.split(";")[0] || "image/jpeg";
-  return { bytes: Buffer.from(await file.arrayBuffer()), contentType, extension: contentType === "image/png" ? "png" : contentType === "image/webp" ? "webp" : "jpg" };
+  return checkedImage(Buffer.from(await file.arrayBuffer()));
 }

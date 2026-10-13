@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -57,7 +58,7 @@ export type PostCardContext = {
   factWarnings: string[];
 };
 
-type Result = { ok: true } | { ok: false; error: { message: string; action?: { label: string; href: string } } };
+type Result = { ok: true } | { ok: false; error: import("@/lib/errors").ActionError };
 
 
 /** One-tap edits. Each changes only this network's version and keeps the facts. */
@@ -93,7 +94,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
     try {
       const result = await fn();
       if (!result.ok) {
-        toast.error(result.error.message, result.error.action ? { action: { label: result.error.action.label, onClick: () => router.push(result.error.action!.href) } } : undefined);
+        showError(result.error);
         return false;
       }
       if (success) toast.success(success);
@@ -116,7 +117,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
     const result = await adaptPostAction({ postId: post.id, instruction: text });
     setBusy(null);
     if (!result.ok) {
-      toast.error(result.error.message);
+      showError(result.error);
       return;
     }
     if (!preset) setInstruction("");
@@ -146,7 +147,7 @@ export function PostCard({ post, ctx }: { post: PostView; ctx: PostCardContext }
         return;
       }
       const result = await attachMedia({ postId: post.id, storagePath: path });
-      if (!result.ok) toast.error(result.error.message);
+      if (!result.ok) showError(result.error);
       else startTransition(() => router.refresh());
     } finally {
       setBusy(null);

@@ -1,10 +1,10 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Check, PenLine } from "lucide-react";
-import { toast } from "sonner";
 import { setPostStatus, updatePostContent } from "@/app/_actions/posts";
 import { goToStep } from "@/app/onboarding/actions";
 import { PlatformIcon } from "@/components/brand/platform-icon";
@@ -67,7 +67,10 @@ export function FirstStoryComposer({ defaultPlatforms, previewLeft, examples }: 
           if (!line.trim()) continue;
           const event = JSON.parse(line);
           if (event.type === "stage") setStage(event.stage);
-          else if (event.type === "error") throw new Error(event.error?.message ?? "Something went wrong.");
+          else if (event.type === "error") {
+            if (event.error?.upgrade) showError(event.error);
+            throw new Error(event.error?.message ?? "Something went wrong.");
+          }
           else if (event.type === "needs_detail") {
             setQuestions(event.questions ?? []);
             setRunning(false);
@@ -283,7 +286,7 @@ function PostCardLite({ post, authorName, onChange }: { post: FirstStoryPost; au
     start(async () => {
       const result = await updatePostContent({ postId: post.id, content: draft, expectedVersion: post.version });
       if (!result.ok) {
-        toast.error(result.error.message);
+        showError(result.error);
         return;
       }
       setEditing(false);
@@ -295,7 +298,7 @@ function PostCardLite({ post, authorName, onChange }: { post: FirstStoryPost; au
     start(async () => {
       const result = await setPostStatus(post.id, approved ? "awaiting_review" : "approved");
       if (!result.ok) {
-        toast.error(result.error.message);
+        showError(result.error);
         return;
       }
       onChange();

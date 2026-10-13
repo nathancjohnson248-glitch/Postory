@@ -10,6 +10,18 @@ export type ActionError = {
   message: string;
   /** Optional suggested next step for the UI to render as a button. */
   action?: { label: string; href: string };
+  /** A plan limit or plan-only feature: the UI shows the upgrade modal instead of a toast. */
+  upgrade?: Upgrade;
+};
+
+/** What ran out, and what the next plan would give. Built only on the server, from the real plan. */
+export type Upgrade = {
+  title: string;
+  body: string;
+  /** The plan the person is on (null = no plan yet). */
+  currentPlan: string | null;
+  /** The next plan up and what it includes, or null if they're already on the top plan. */
+  next: { id: string; name: string; offer: string } | null;
 };
 
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: ActionError };
@@ -20,8 +32,8 @@ export function ok<T>(data?: T): ActionResult<T | undefined> {
   return { ok: true, data };
 }
 
-export function fail(code: string, message: string, action?: ActionError["action"]): { ok: false; error: ActionError } {
-  return { ok: false, error: { code, message, ...(action ? { action } : {}) } };
+export function fail(code: string, message: string, action?: ActionError["action"], upgrade?: Upgrade): { ok: false; error: ActionError } {
+  return { ok: false, error: { code, message, ...(action ? { action } : {}), ...(upgrade ? { upgrade } : {}) } };
 }
 
 export class UserFacingError extends Error {
@@ -29,6 +41,7 @@ export class UserFacingError extends Error {
     public readonly code: string,
     message: string,
     public readonly action?: ActionError["action"],
+    public readonly upgrade?: Upgrade,
   ) {
     super(message);
     this.name = "UserFacingError";

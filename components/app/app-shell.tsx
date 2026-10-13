@@ -23,6 +23,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { PlatformIcon } from "@/components/brand/platform-icon";
 import { Dialog } from "@/components/ui/dialog";
+import { UpgradeModal } from "@/components/app/upgrade-modal";
 import type { Platform } from "@/lib/social/platforms";
 import { cn } from "@/lib/utils";
 
@@ -181,6 +182,7 @@ export function AppShell({
         </Link>
       </header>
 
+      <UpgradeModal />
       <main id="main" className="min-w-0 px-4 pb-28 pt-6 sm:px-8 lg:px-12 lg:pb-16 lg:pt-10">
         <div className="mx-auto max-w-[1180px]">{children}</div>
       </main>

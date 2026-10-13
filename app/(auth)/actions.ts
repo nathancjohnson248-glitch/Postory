@@ -5,7 +5,8 @@ import {
   authEmailMode,
   confirmWithoutEmail,
   createConfirmedAccount,
-  markEmailProven,
+  verifyCodeAndSignIn,
+  type CodeCheck,
   resendSignupCode,
   sendEmailCode,
   sendPasswordResetCode,
@@ -212,6 +213,13 @@ export async function requestEmailCode(_prev: AuthFormState, formData: FormData)
   redirect("/verify");
 }
 
+const CODE_ERRORS: Record<Exclude<CodeCheck, { ok: true }>["reason"], string> = {
+  invalid: "That code isn't right. Check the email and try again.",
+  expired: "That code has expired. Send a new one.",
+  too_many: "Too many wrong tries for that code. Send a new one.",
+  no_account: "There's no account for that address any more. Start again.",
+};
+
 export async function verifySignupCode(_prev: AuthFormState, formData: FormData): Promise<AuthFormState> {
   const pending = await getPendingEmail("verify");
   if (!pending) return { error: "This sign-up has timed out. Start again or log in.", attempt: Date.now() };
@@ -221,16 +229,14 @@ export async function verifySignupCode(_prev: AuthFormState, formData: FormData)
   const locked = lockedFor("code", pending.email);
   if (locked) return { error: lockedMessage(locked), attempt: Date.now() };
 
-  const supabase = await createClient();
-  let { data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "email" });
-  // Login codes are recovery tokens; accept them on the recovery path too.
-  if (error && !pending.fresh) ({ data, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "recovery" }));
-  if (error) {
+  const result = await verifyCodeAndSignIn(pending.email, "verify", code.data);
+  if (!result.ok) {
     recordFailure("code", pending.email);
-    return { error: friendlyAuthError(error), attempt: Date.now() };
+    return { error: CODE_ERRORS[result.reason], attempt: Date.now() };
   }
   clearFailures("code", pending.email);
-  if (data.user) await markEmailProven(data.user.id);
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
 
   await clearPendingEmail("verify");
   if (!pending.fresh) redirect("/app");
@@ -378,13 +384,12 @@ export async function resetPassword(_prev: AuthFormState, formData: FormData): P
     if (!code.success) return { error: firstError(code.error), attempt: Date.now() };
     const locked = lockedFor("reset", pending.email);
     if (locked) return { error: lockedMessage(locked), attempt: Date.now() };
-    const { data: verified, error } = await supabase.auth.verifyOtp({ email: pending.email, token: code.data, type: "recovery" });
-    if (error) {
+    const result = await verifyCodeAndSignIn(pending.email, "reset", code.data);
+    if (!result.ok) {
       recordFailure("reset", pending.email);
-      return { error: friendlyAuthError(error), attempt: Date.now() };
+      return { error: CODE_ERRORS[result.reason], attempt: Date.now() };
     }
     clearFailures("reset", pending.email);
-    if (verified.user) await markEmailProven(verified.user.id);
   }
 
   const { error } = await supabase.auth.updateUser({ password: password.data });

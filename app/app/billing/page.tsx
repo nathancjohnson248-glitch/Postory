@@ -156,7 +156,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </section>
       </div>
 
-      <div className="mt-12">
+      <div id="plans" className="mt-12 scroll-mt-24">
         <h2 className="mb-6 text-[20px] font-semibold tracking-[-0.02em]">{live ? "Change plan" : "Plans"}</h2>
         {live && subscription && isPlanId(subscription.plan) && availability.changePlan ? (
           <ChangePlanCards currentPlan={subscription.plan} />

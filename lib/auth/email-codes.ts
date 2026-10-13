@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { headers } from "next/headers";
 import { env, integrations } from "@/lib/env";
 import { sendEmail } from "@/lib/email/send";
@@ -9,11 +9,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 /**
- * Postory's own sign-in codes. When an email sender is configured (an SMTP
- * mailbox such as Zoho Mail, or Resend), Postory asks the
- * Auth admin API for a one-time code (no email is sent by Supabase) and
- * delivers it from Postory's address. The code is verified with the regular
- * `verifyOtp` call, so Supabase still owns the account and its session.
+ * Postory's own sign-in codes. When an email sender is configured, Postory
+ * issues a six-digit code, stores only an HMAC of it (an hour to live, five
+ * tries), and emails it from Postory's address. A correct code opens a normal
+ * Supabase session, minted server-side from a one-time token that never
+ * leaves the server, so Supabase still owns the account and its session.
  *
  * Emails only ever contain a code — never a link.
  */
@@ -88,6 +88,74 @@ async function claimSend(email: string, purpose: "signup" | "recovery") {
   return row?.allowed ? { ok: true as const } : { ok: false as const, retryAfter: row?.retry_after_seconds ?? 60 };
 }
 
+// --- Six-digit codes ----------------------------------------------------------------
+
+export const CODE_LENGTH = 6;
+const CODE_TTL_MS = 60 * 60 * 1000;
+const MAX_CODE_TRIES = 5;
+type CodePurpose = "verify" | "reset";
+
+function codeHash(email: string, purpose: CodePurpose, code: string) {
+  const secret = env.credentialsKey() ?? env.supabaseSecretKey() ?? "";
+  return createHmac("sha256", secret).update(`${purpose}:${email.toLowerCase()}:${code}`).digest("hex");
+}
+
+/** A fresh code for this address and purpose; any earlier one stops working. */
+async function issueCode(email: string, purpose: CodePurpose) {
+  const code = String(randomInt(0, 10 ** CODE_LENGTH)).padStart(CODE_LENGTH, "0");
+  const admin = createAdminClient();
+  const emailHash = sha256(`email:${email.toLowerCase()}`);
+  await admin.from("email_codes").delete().eq("email_hash", emailHash).eq("purpose", purpose);
+  const { error } = await admin.from("email_codes").insert({
+    email_hash: emailHash,
+    purpose,
+    code_hash: codeHash(email, purpose, code),
+    expires_at: new Date(Date.now() + CODE_TTL_MS).toISOString(),
+  });
+  if (error) throw error;
+  return code;
+}
+
+export type CodeCheck = { ok: true; userId: string } | { ok: false; reason: "invalid" | "expired" | "too_many" | "no_account" };
+
+/**
+ * Check a code and, if it's right, open a session for the address. The code
+ * is single-use; five wrong tries burn it.
+ */
+export async function verifyCodeAndSignIn(email: string, purpose: CodePurpose, code: string): Promise<CodeCheck> {
+  const admin = createAdminClient();
+  const emailHash = sha256(`email:${email.toLowerCase()}`);
+  const { data: row } = await admin.from("email_codes").select("*").eq("email_hash", emailHash).eq("purpose", purpose).maybeSingle();
+  if (!row) return { ok: false, reason: "invalid" };
+  if (new Date(row.expires_at).getTime() < Date.now()) return { ok: false, reason: "expired" };
+  if (row.attempts >= MAX_CODE_TRIES) return { ok: false, reason: "too_many" };
+
+  const expected = Buffer.from(row.code_hash, "hex");
+  const given = Buffer.from(codeHash(email, purpose, code), "hex");
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) {
+    await admin.from("email_codes").update({ attempts: row.attempts + 1 }).eq("id", row.id);
+    return { ok: false, reason: row.attempts + 1 >= MAX_CODE_TRIES ? "too_many" : "invalid" };
+  }
+  // Single use: only the request that deletes the row gets to sign in.
+  const { data: claimed } = await admin.from("email_codes").delete().eq("id", row.id).select("id");
+  if (!claimed?.length) return { ok: false, reason: "invalid" };
+
+  const account = await accountStatus(email);
+  if (!account) return { ok: false, reason: "no_account" };
+  if (!account.confirmed) {
+    const { error } = await admin.auth.admin.updateUserById(account.userId, { email_confirm: true });
+    if (error) throw error;
+  }
+  const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
+  const tokenHash = data?.properties?.hashed_token;
+  if (error || !tokenHash) throw error ?? new Error("no token in generated link");
+  const supabase = await createClient();
+  const { error: verifyError } = await supabase.auth.verifyOtp({ type: "magiclink", token_hash: tokenHash });
+  if (verifyError) throw verifyError;
+  await markEmailProven(account.userId);
+  return { ok: true, userId: account.userId };
+}
+
 async function deliver(email: string, template: "signupCode" | "resetCode" | "loginCode", code: string): Promise<CodeOutcome> {
   const result = await sendEmail(email, template, { code });
   return result.sent ? { status: "sent", codeLength: code.length } : { status: "failed" };
@@ -125,10 +193,7 @@ export async function sendEmailCode(email: string): Promise<EmailCodeOutcome> {
       if (error && error.code !== "email_exists" && error.code !== "user_already_exists") throw error;
     }
 
-    const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email });
-    if (error) throw error;
-    const code = data.properties?.email_otp;
-    if (!code) throw new Error("Auth returned no code");
+    const code = await issueCode(email, "verify");
     const sent = await deliver(email, fresh ? "signupCode" : "loginCode", code);
     return sent.status === "sent" ? { status: "sent", codeLength: sent.codeLength, fresh } : { status: "failed" };
   } catch (error) {
@@ -168,9 +233,8 @@ export async function startSignupWithCode(input: { email: string; password: stri
       if (error.code === "weak_password" || error.code === "validation_failed") return { status: "invalid", message: error.message };
       throw error;
     }
-    const code = data.properties?.email_otp;
-    if (!code) throw new Error("Auth returned no code");
-    return await deliver(input.email, "signupCode", code);
+    if (!data.user) throw new Error("Auth created no user");
+    return await deliver(input.email, "signupCode", await issueCode(input.email, "verify"));
   } catch (error) {
     log.error("signup code failed", { operation: "auth.codes.signup", provider: "supabase" }, error);
     return { status: "failed" };
@@ -192,11 +256,7 @@ export async function resendSignupCode(email: string): Promise<CodeOutcome> {
     const claim = await claimSend(email, "signup");
     if (!claim.ok) return { status: "throttled", retryAfter: claim.retryAfter };
 
-    const { data, error } = await createAdminClient().auth.admin.generateLink({ type: "recovery", email });
-    if (error) throw error;
-    const code = data.properties?.email_otp;
-    if (!code) throw new Error("Auth returned no code");
-    return await deliver(email, "signupCode", code);
+    return await deliver(email, "signupCode", await issueCode(email, "verify"));
   } catch (error) {
     log.error("signup code resend failed", { operation: "auth.codes.resend", provider: "supabase" }, error);
     return { status: "failed" };
@@ -212,11 +272,7 @@ export async function sendPasswordResetCode(email: string): Promise<CodeOutcome>
     const claim = await claimSend(email, "recovery");
     if (!claim.ok) return { status: "throttled", retryAfter: claim.retryAfter };
 
-    const { data, error } = await createAdminClient().auth.admin.generateLink({ type: "recovery", email });
-    if (error) throw error;
-    const code = data.properties?.email_otp;
-    if (!code) throw new Error("Auth returned no code");
-    return await deliver(email, "resetCode", code);
+    return await deliver(email, "resetCode", await issueCode(email, "reset"));
   } catch (error) {
     log.error("reset code failed", { operation: "auth.codes.reset", provider: "supabase" }, error);
     return { status: "failed" };

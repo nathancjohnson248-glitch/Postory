@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -71,7 +72,7 @@ export function AssistantPanel({
     const result = await adaptPostAction({ postId: proposal.postId, instruction: proposal.instruction });
     setApplied((a) => ({ ...a, [key]: result.ok ? "done" : "error" }));
     if (result.ok) toast.success("Post updated. It's back in review.");
-    else toast.error(result.error.message);
+    else showError(result.error);
   }
 
   return (
@@ -211,7 +212,7 @@ export function AssistantPanel({
                   const result = await reschedulePostAction({ postId: confirm.proposal.postId, scheduledFor: confirm.proposal.scheduledFor });
                   setApplied((a) => ({ ...a, [confirm.key]: result.ok ? "done" : "error" }));
                   if (result.ok) toast.success("Rescheduled.");
-                  else toast.error(result.error.message);
+                  else showError(result.error);
                   setConfirm(null);
                 })
               }

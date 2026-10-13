@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ export function RefreshBillingButton() {
       onClick={() =>
         start(async () => {
           const result = await refreshSubscription();
-          if (!result.ok) toast.error(result.error.message);
+          if (!result.ok) showError(result.error);
           router.refresh();
         })
       }
@@ -43,11 +44,11 @@ export function ManageBillingButton() {
         start(async () => {
           const result = await openBillingPortal();
           if (result.ok) window.location.assign(result.data.url);
-          else toast.error(result.error.message);
+          else showError(result.error);
         })
       }
     >
-      Manage billing
+      Manage plan
     </Button>
   );
 }
@@ -63,7 +64,7 @@ export function CancelSubscriptionButton({ periodEnd }: { periodEnd: string | nu
       onConfirm={async () => {
         const result = await cancelSubscriptionAction();
         if (result.ok) toast.success("Subscription cancelled.");
-        else toast.error(result.error.message);
+        else showError(result.error);
         router.refresh();
       }}
     >
@@ -83,7 +84,7 @@ export function ResumeSubscriptionButton() {
         start(async () => {
           const result = await resumeSubscriptionAction();
           if (result.ok) toast.success("Your subscription will continue.");
-          else toast.error(result.error.message);
+          else showError(result.error);
           router.refresh();
         })
       }
@@ -118,7 +119,7 @@ export function ChangePlanCards({ currentPlan }: { currentPlan: PlanId }) {
             onConfirm={async () => {
               const result = await startPlanCheckout(plan, "/app/billing");
               if (result.ok) window.location.assign(result.data.url);
-              else toast.error(result.error.message);
+              else showError(result.error);
             }}
           >
             {order.indexOf(plan) > order.indexOf(currentPlan) ? "Upgrade" : "Downgrade"}

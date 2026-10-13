@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -83,7 +84,7 @@ export function InboxItem({ item, aiEnabled, when }: { item: InboxItemView; aiEn
                   startDraft(async () => {
                     const result = await draftInboxReply(item.id);
                     if (result.ok) setDraft(result.data.reply);
-                    else toast.error(result.error.message);
+                    else showError(result.error);
                   })
                 }
               >
@@ -120,7 +121,7 @@ export function InboxItem({ item, aiEnabled, when }: { item: InboxItemView; aiEn
                   onClick={() =>
                     startSend(async () => {
                       const result = await sendInboxReplyAction(item.id, draft);
-                      if (!result.ok) return void toast.error(result.error.message);
+                      if (!result.ok) return void showError(result.error);
                       toast.success(`Replied on ${PLATFORM_META[item.platform].name}.`);
                       router.refresh();
                     })
@@ -138,7 +139,7 @@ export function InboxItem({ item, aiEnabled, when }: { item: InboxItemView; aiEn
                   startMark(async () => {
                     const result = await markInboxReplied(item.id);
                     if (result.ok) router.refresh();
-                    else toast.error(result.error.message);
+                    else showError(result.error);
                   })
                 }
               >

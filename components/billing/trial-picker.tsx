@@ -1,9 +1,9 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Check, ShieldCheck } from "lucide-react";
-import { toast } from "sonner";
 import { startPlanCheckout } from "@/app/_actions/billing";
 import { Button } from "@/components/ui/button";
 import { PLANS, PLAN_IDS, TRIAL_DAYS, type PlanId } from "@/lib/billing/plans";
@@ -32,7 +32,7 @@ export function TrialPicker({ returnPath, trialEligible }: { returnPath: "/onboa
     const result = await startPlanCheckout(selected, returnPath);
     if (!result.ok) {
       setPending(false);
-      toast.error(result.error.message);
+      showError(result.error);
       return;
     }
     window.location.assign(result.data.url);

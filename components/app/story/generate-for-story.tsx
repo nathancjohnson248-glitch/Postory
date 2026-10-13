@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogoMark } from "@/components/brand/logo";
@@ -57,7 +58,10 @@ export function GenerateForStory({
         for (const line of lines.filter(Boolean)) {
           const event = JSON.parse(line);
           if (event.type === "stage") setStage(event.stage);
-          if (event.type === "error") throw event.error;
+          if (event.type === "error") {
+            if (event.error?.upgrade) showError(event.error);
+            throw event.error;
+          }
           if (event.type === "needs_detail") throw { message: `Postory needs more detail about this story to write it without guessing. ${event.questions?.[0] ?? ""}`.trim() };
           if (event.type === "done") {
             router.refresh();

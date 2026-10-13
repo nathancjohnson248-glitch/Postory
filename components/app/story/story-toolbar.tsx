@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -24,7 +25,7 @@ export function StoryToolbar({ storyId, archived, reviewCount }: { storyId: stri
             start(async () => {
               const result = await approveAllInStory(storyId);
               if (result.ok) toast.success(`Approved ${result.data.approved} ${result.data.approved === 1 ? "post" : "posts"}.`);
-              else toast.error(result.error.message);
+              else showError(result.error);
               router.refresh();
             })
           }
@@ -40,7 +41,7 @@ export function StoryToolbar({ storyId, archived, reviewCount }: { storyId: stri
             start(async () => {
               const result = await restoreStory(storyId);
               if (result.ok) toast.success("Story restored.");
-              else toast.error(result.error.message);
+              else showError(result.error);
               router.refresh();
             })
           }
@@ -58,7 +59,7 @@ export function StoryToolbar({ storyId, archived, reviewCount }: { storyId: stri
           onConfirm={async () => {
             const result = await archiveStory(storyId);
             if (result.ok) toast.success("Archived.");
-            else toast.error(result.error.message);
+            else showError(result.error);
             router.refresh();
           }}
         >
@@ -73,7 +74,7 @@ export function StoryToolbar({ storyId, archived, reviewCount }: { storyId: stri
         confirmLabel="Delete story"
         onConfirm={async () => {
           const result = await deleteStory(storyId);
-          if (result && !result.ok) toast.error(result.error.message);
+          if (result && !result.ok) showError(result.error);
         }}
       >
         Delete

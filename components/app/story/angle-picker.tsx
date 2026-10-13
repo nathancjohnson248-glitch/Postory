@@ -1,5 +1,6 @@
 "use client";
 
+import { showError } from "@/lib/client/show-error";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { LogoMark } from "@/components/brand/logo";
@@ -19,7 +20,7 @@ export function AnglePicker({ storyId, angles, current, aiEnabled }: { storyId: 
     const result = await rewriteStoryAroundAngle({ storyId, angle });
     setBusy(null);
     if (!result.ok) {
-      toast.error(result.error.message);
+      showError(result.error);
       return;
     }
     toast.success(`Rewrote ${result.data.rewritten} ${result.data.rewritten === 1 ? "draft" : "drafts"} around “${angle}”.`);
