@@ -9,14 +9,17 @@ import { log } from "@/lib/log";
 /**
  * Postory's one door to its models, all server-side:
  *
- *   text   SambaNova (SAMBANOVA_MODEL / SAMBANOVA_FAST_MODEL) first, then
- *          Replicate (REPLICATE_TEXT_MODEL / REPLICATE_FAST_MODEL) if SambaNova
- *          is busy or refuses
- *   images Replicate (REPLICATE_IMAGE_MODEL, default FLUX 1.1 Pro)
+ *   text    GitHub Models, OpenAI-compatible chat completions
+ *           GITHUB_MODELS_BASE_URL  (default https://models.inference.ai.azure.com)
+ *           GITHUB_MODELS_TOKEN     a GitHub token with the models:read permission
+ *           GITHUB_MODELS_MODEL     (default meta-llama-3-70b-instruct)
+ *           GITHUB_MODELS_FAST_MODEL (quick checks; defaults to the same model)
+ *   images  Replicate only: REPLICATE_API_TOKEN, REPLICATE_IMAGE_MODEL (FLUX 1.1 Pro)
  *
- * Every call puts the JSON Schema in the instructions, extracts the object
- * from the answer, and validates it with zod. A malformed answer is retried
- * once; model output is never trusted as-is, and callers validate again.
+ * Every text call puts the JSON Schema in the instructions, extracts the
+ * object from the answer, and validates it with zod. A malformed answer is
+ * retried once; model output is never trusted as-is, and callers validate
+ * again with their own limits.
  */
 
 export class LlmError extends Error {
@@ -31,13 +34,38 @@ export class LlmError extends Error {
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
-export function llmProvider(): "sambanova" | "replicate" | null {
-  return integrations.sambanova() ? "sambanova" : integrations.replicate() ? "replicate" : null;
+export function llmProvider(): "github" | null {
+  return integrations.githubModels() ? "github" : null;
 }
 
 export function imageAvailable() {
   return integrations.replicate();
 }
+
+const SAVED = "Anything you wrote is saved, so try again in a few minutes.";
+
+// --- Owner alerts -----------------------------------------------------------------
+
+const lastAlert = new Map<string, number>();
+
+/** Email the owner (at most every six hours per problem) when a provider refuses Postory's account. */
+function alertOwner(key: string, alert: { title: string; body: string; actionLabel: string; actionUrl: string }) {
+  if (Date.now() - (lastAlert.get(key) ?? 0) < 6 * 3_600_000) return;
+  lastAlert.set(key, Date.now());
+  log.error("ai provider refused the account", { operation: "ai.account", reason: key });
+  void sendEmail(OWNER_EMAILS[0], "ownerAlert", alert).catch(() => undefined);
+}
+
+// --- Text: GitHub Models ------------------------------------------------------------
+
+type StructuredInput<S extends z.ZodType> = {
+  system: string;
+  turns: ChatTurn[];
+  schema: S;
+  name: string;
+  /** "fast" for quick checks where a smaller model is enough. */
+  tier?: "best" | "fast";
+};
 
 /** JSON Schema for the instructions, from the zod model schema. */
 function jsonSchemaFor(schema: z.ZodType) {
@@ -46,27 +74,145 @@ function jsonSchemaFor(schema: z.ZodType) {
   return json;
 }
 
-// --- Replicate ------------------------------------------------------------------
-
-let lastAlert = 0;
-
-/** Email the owner (at most every six hours) when Replicate refuses Postory's account. */
-function alertOwner(reason: "credit" | "token" | "model", model: string) {
-  if (Date.now() - lastAlert < 6 * 3_600_000) return;
-  lastAlert = Date.now();
-  log.error("replicate refused the account", { operation: "ai.replicate.account", provider: "replicate", reason, model });
-  void sendEmail(OWNER_EMAILS[0], "ownerAlert", {
-    title: reason === "credit" ? "Replicate is out of credit" : reason === "token" ? "Replicate rejected Postory's token" : `Replicate can't find ${model}`,
-    body:
-      reason === "credit"
-        ? "Every AI request (writing posts, the assistant, images) is failing until credit is added. Add credit at replicate.com/account/billing; Postory recovers by itself as soon as it's there."
-        : reason === "token"
-          ? "Check REPLICATE_API_TOKEN in Railway. Every AI request fails until it's fixed."
-          : `Check REPLICATE_TEXT_MODEL / REPLICATE_FAST_MODEL / REPLICATE_IMAGE_MODEL in Railway: "${model}" didn't resolve.`,
-    actionLabel: reason === "credit" ? "Add Replicate credit" : "Open Railway",
-    actionUrl: reason === "credit" ? "https://replicate.com/account/billing" : "https://railway.com/dashboard",
-  }).catch(() => undefined);
+export function withSchema(system: string, schema: z.ZodType) {
+  return `${system}\n\nRespond with only one JSON object that matches this JSON Schema. No prose, no code fences.\n${JSON.stringify(jsonSchemaFor(schema))}`;
 }
+
+/** Pull the JSON object out of the answer, tolerating a stray fence or preamble. */
+export function extractObject(text: string): unknown {
+  if (!text.trim()) throw new LlmError("invalid_output", "Postory's AI returned nothing. Try again.");
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  try {
+    return JSON.parse(start >= 0 && end > start ? text.slice(start, end + 1) : text);
+  } catch {
+    throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
+  }
+}
+
+/** The request Postory sends: a standard OpenAI-style chat completion. */
+export function chatRequest(input: { model: string; system: string; turns: ChatTurn[]; maxTokens: number }) {
+  return {
+    model: input.model,
+    messages: [{ role: "system" as const, content: input.system }, ...input.turns.map((t) => ({ role: t.role, content: t.content }))],
+    max_tokens: input.maxTokens,
+    temperature: 0.5,
+  };
+}
+
+/** POST {base}/chat/completions with the GitHub token. Returns the assistant's text. */
+async function chatCompletion(model: string, system: string, turns: ChatTurn[], maxTokens: number): Promise<string> {
+  const token = env.githubModelsToken();
+  if (!token) throw new ConfigurationError("GITHUB_MODELS_TOKEN");
+  const url = `${env.githubModelsBaseUrl()}/chat/completions`;
+
+  for (let attempt = 0; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(chatRequest({ model, system, turns, maxTokens })),
+        signal: AbortSignal.timeout(120_000),
+        cache: "no-store",
+      });
+    } catch (error) {
+      log.warn("github models request failed", { operation: "ai.github", provider: "github", model }, error);
+      throw new LlmError("provider_error", `Postory's AI didn't respond. ${SAVED}`);
+    }
+
+    const data = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string } }[]; error?: { code?: string; message?: string } };
+    if (res.ok) {
+      const text = data.choices?.[0]?.message?.content;
+      if (typeof text !== "string") throw new LlmError("invalid_output", "Postory's AI returned nothing. Try again.");
+      return text;
+    }
+
+    log.warn("github models error response", { operation: "ai.github", provider: "github", model, status: res.status, code: data.error?.code });
+    if (res.status === 429) {
+      // A per-minute limit clears quickly: wait it out once. A daily cap doesn't.
+      const wait = Number(res.headers.get("retry-after")) || 0;
+      if (attempt === 0 && wait > 0 && wait <= 20) {
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        continue;
+      }
+      if (wait > 20) {
+        alertOwner("github-limit", {
+          title: "GitHub Models rate limit reached",
+          body: `GitHub Models is refusing requests for the next ${Math.round(wait / 60)} minutes. The free tier caps requests per day; turn on paid usage for GitHub Models in your GitHub billing settings to lift it.`,
+          actionLabel: "GitHub billing",
+          actionUrl: "https://github.com/settings/billing",
+        });
+      }
+      throw new LlmError("provider_error", `Postory's AI is busy right now. ${SAVED}`);
+    }
+    if (res.status === 401 || res.status === 403) {
+      alertOwner("github-token", {
+        title: "GitHub Models rejected Postory's token",
+        body: "Check GITHUB_MODELS_TOKEN in Railway: it must be a GitHub token with the models:read permission. Every AI request fails until it's fixed.",
+        actionLabel: "Open Railway",
+        actionUrl: "https://railway.com/dashboard",
+      });
+      throw new LlmError("unavailable", `Postory's AI couldn't respond just now. ${SAVED}`);
+    }
+    if (res.status === 404 || data.error?.code === "unknown_model") {
+      alertOwner("github-model", {
+        title: `GitHub Models can't find ${model}`,
+        body: `Check GITHUB_MODELS_MODEL / GITHUB_MODELS_FAST_MODEL and GITHUB_MODELS_BASE_URL in Railway: "${model}" didn't resolve at ${env.githubModelsBaseUrl()}.`,
+        actionLabel: "Open Railway",
+        actionUrl: "https://railway.com/dashboard",
+      });
+      throw new LlmError("unavailable", `Postory's AI couldn't respond just now. ${SAVED}`);
+    }
+    if (res.status === 400 && /content|filter|policy/i.test(data.error?.code ?? data.error?.message ?? "")) {
+      throw new LlmError("refused", "The AI's safety filter declined this one. Try rewording it.");
+    }
+    throw new LlmError("provider_error", `Postory's AI hit a problem. ${SAVED}`);
+  }
+}
+
+/**
+ * One structured call: a system prompt, the conversation (or a single user
+ * message), and the schema the answer must follow. Returns the parsed object
+ * (callers still apply their own validated schema with length limits).
+ */
+export async function generateStructured<S extends z.ZodType>(input: StructuredInput<S>): Promise<z.infer<S>> {
+  if (!integrations.githubModels()) throw new LlmError("unavailable", "Postory's AI isn't set up on this deployment yet.");
+  const fast = input.tier === "fast";
+  const model = fast ? env.githubModelsFastModel() : env.githubModelsModel();
+  const system = withSchema(input.system, input.schema);
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const text = await chatCompletion(model, system, input.turns, fast ? env.githubModelsMaxTokens() / 2 : env.githubModelsMaxTokens());
+      const result = input.schema.safeParse(extractObject(text));
+      if (!result.success) throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
+      return result.data;
+    } catch (error) {
+      lastError = error;
+      // A malformed answer is worth one more try; anything else goes back to the caller.
+      if (!(error instanceof LlmError && error.code === "invalid_output")) throw error;
+      log.warn("model output rejected, retrying", { operation: `ai.${input.name}`, provider: "github", model, attempt });
+    }
+  }
+  throw lastError;
+}
+
+/** A tiny real request, for the owner's health check. */
+export async function checkTextModel() {
+  const started = Date.now();
+  const result = await generateStructured({
+    system: "You are a health check.",
+    turns: [{ role: "user", content: 'Reply with {"ok": true}.' }],
+    schema: z.object({ ok: z.boolean() }),
+    name: "health_check",
+    tier: "fast",
+  });
+  return { ok: result.ok, model: env.githubModelsFastModel(), baseUrl: env.githubModelsBaseUrl(), ms: Date.now() - started };
+}
+
+// --- Images: Replicate ------------------------------------------------------------
 
 type Prediction = { id?: string; status?: string; output?: unknown; error?: unknown; urls?: { get?: string } };
 
@@ -75,10 +221,9 @@ type Prediction = { id?: string; status?: string; output?: unknown; error?: unkn
  * holds the request up to 60s); anything still running is polled until done
  * or the deadline passes. https://replicate.com/docs/reference/http
  */
-async function predict(model: string, input: Record<string, unknown>, timeoutMs: number, what: "text" | "image"): Promise<unknown> {
+async function predict(model: string, input: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
   const token = env.replicateApiToken();
   if (!token) throw new ConfigurationError("REPLICATE_API_TOKEN");
-  const noun = what === "text" ? "Postory's AI" : "Image generation";
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const deadline = Date.now() + timeoutMs;
 
@@ -92,29 +237,35 @@ async function predict(model: string, input: Record<string, unknown>, timeoutMs:
       cache: "no-store",
     });
   } catch (error) {
-    log.warn("replicate request failed", { operation: `ai.replicate.${what}`, provider: "replicate", model }, error);
-    throw new LlmError("provider_error", `${noun} didn't respond. Nothing was lost, so try again.`);
+    log.warn("replicate request failed", { operation: "ai.replicate.image", provider: "replicate", model }, error);
+    throw new LlmError("provider_error", "Image generation didn't respond. Nothing was lost, so try again.");
   }
 
   let prediction = (await res.json().catch(() => ({}))) as Prediction;
   if (!res.ok) {
-    log.warn("replicate error response", { operation: `ai.replicate.${what}`, provider: "replicate", model, status: res.status });
-    // Account problems (no credit, bad token, wrong model) are ours to fix, not
-    // the customer's: tell the owner, and give the customer a plain message.
+    log.warn("replicate error response", { operation: "ai.replicate.image", provider: "replicate", model, status: res.status });
     if (res.status === 401 || res.status === 402 || res.status === 403 || res.status === 404) {
-      alertOwner(res.status === 402 ? "credit" : res.status === 404 ? "model" : "token", model);
-      throw new LlmError("unavailable", `${noun} couldn't respond just now. Anything you wrote is saved, so try again in a few minutes.`);
+      alertOwner(`replicate-${res.status}`, {
+        title: res.status === 402 ? "Replicate is out of credit" : res.status === 404 ? `Replicate can't find ${model}` : "Replicate rejected Postory's token",
+        body:
+          res.status === 402
+            ? "Image generation is failing until credit is added. Add credit at replicate.com/account/billing; Postory recovers by itself."
+            : "Check REPLICATE_API_TOKEN and REPLICATE_IMAGE_MODEL in Railway. Image generation fails until it's fixed.",
+        actionLabel: res.status === 402 ? "Add Replicate credit" : "Open Railway",
+        actionUrl: res.status === 402 ? "https://replicate.com/account/billing" : "https://railway.com/dashboard",
+      });
+      throw new LlmError("unavailable", `Image generation couldn't run just now. ${SAVED}`);
     }
-    if (res.status === 422) throw new LlmError("provider_error", `${noun} couldn't take that request. Try rewording it.`);
-    if (res.status === 429) throw new LlmError("provider_error", `${noun} is busy. Try again in a minute.`);
-    throw new LlmError("provider_error", `${noun} hit a problem. Nothing was lost, so try again.`);
+    if (res.status === 422) throw new LlmError("provider_error", "Image generation couldn't take that request. Try rewording it.");
+    if (res.status === 429) throw new LlmError("provider_error", "Image generation is busy. Try again in a minute.");
+    throw new LlmError("provider_error", "Image generation hit a problem. Nothing was lost, so try again.");
   }
 
   while (prediction.status === "starting" || prediction.status === "processing") {
     if (Date.now() > deadline || !prediction.urls?.get) {
       // Don't leave a long job running (and billing) after we've given up on it.
       if (prediction.id) void fetch(`https://api.replicate.com/v1/predictions/${prediction.id}/cancel`, { method: "POST", headers }).catch(() => undefined);
-      throw new LlmError("provider_error", `${noun} took too long. Try again.`);
+      throw new LlmError("provider_error", "Image generation took too long. Try again.");
     }
     await new Promise((r) => setTimeout(r, 1500));
     const poll = await fetch(prediction.urls.get, { headers, cache: "no-store", signal: AbortSignal.timeout(15_000) }).catch(() => null);
@@ -123,147 +274,13 @@ async function predict(model: string, input: Record<string, unknown>, timeoutMs:
 
   if (prediction.status !== "succeeded") {
     const detail = typeof prediction.error === "string" ? prediction.error : "";
-    log.warn("replicate prediction failed", { operation: `ai.replicate.${what}`, provider: "replicate", model, status: prediction.status, detail: detail.slice(0, 200) });
+    log.warn("replicate prediction failed", { operation: "ai.replicate.image", provider: "replicate", model, status: prediction.status, detail: detail.slice(0, 200) });
     // Image models refuse unsafe prompts with an NSFW / safety error.
     if (/nsfw|safety|flagged|sensitive/i.test(detail)) throw new LlmError("refused", "That image request was declined by the model's safety filter. Try a different description.");
-    throw new LlmError("provider_error", `${noun} hit a problem. Nothing was lost, so try again.`);
+    throw new LlmError("provider_error", "Image generation hit a problem. Nothing was lost, so try again.");
   }
   return prediction.output;
 }
-
-// --- Text -----------------------------------------------------------------------
-
-type StructuredInput<S extends z.ZodType> = {
-  system: string;
-  turns: ChatTurn[];
-  schema: S;
-  name: string;
-  /** "fast" for quick checks where a smaller model is enough. */
-  tier?: "best" | "fast";
-};
-
-/** Pull the JSON object out of the answer, tolerating a stray fence or preamble. */
-function extractObject(output: unknown): unknown {
-  const text = Array.isArray(output) ? output.join("") : typeof output === "string" ? output : "";
-  if (!text.trim()) throw new LlmError("invalid_output", "Postory's AI returned nothing. Try again.");
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  try {
-    return JSON.parse(start >= 0 && end > start ? text.slice(start, end + 1) : text);
-  } catch {
-    throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
-  }
-}
-
-// --- SambaNova (text) ---------------------------------------------------------
-
-/** Providers that refused Postory's account recently (no access, no credit), and until when to skip them. */
-const benched = new Map<string, number>();
-
-/**
- * SambaNova Cloud's OpenAI-compatible chat API (https://docs.sambanova.ai).
- * JSON mode keeps the answer parseable; the schema itself goes in the system
- * prompt, and the result is validated like every other provider's.
- */
-async function sambanova(model: string, system: string, turns: ChatTurn[], maxTokens: number): Promise<string> {
-  const key = env.sambanovaApiKey();
-  if (!key) throw new ConfigurationError("SAMBANOVA_API_KEY");
-  for (let attempt = 0; ; attempt++) {
-    let res: Response;
-    try {
-      res = await fetch("https://api.sambanova.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "system", content: system }, ...turns.map((t) => ({ role: t.role, content: t.content }))],
-          max_tokens: maxTokens,
-          temperature: 0.5,
-          response_format: { type: "json_object" },
-        }),
-        signal: AbortSignal.timeout(120_000),
-        cache: "no-store",
-      });
-    } catch (error) {
-      log.warn("sambanova request failed", { operation: "ai.sambanova", provider: "sambanova", model }, error);
-      throw new LlmError("provider_error", "Postory's AI didn't respond. Nothing was lost, so try again.");
-    }
-    const data = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string } }[]; error?: { message?: string } };
-    if (res.ok) return data.choices?.[0]?.message?.content ?? "";
-    log.warn("sambanova error response", { operation: "ai.sambanova", provider: "sambanova", model, status: res.status });
-    // Rate limits are short: wait out one, then let the next provider take it.
-    if (res.status === 429 && attempt === 0) {
-      const wait = Math.min(Number(res.headers.get("retry-after")) || 3, 8);
-      await new Promise((r) => setTimeout(r, wait * 1000));
-      continue;
-    }
-    if (res.status === 401 || res.status === 402 || res.status === 403 || res.status === 404) throw new LlmError("unavailable", "Postory's AI couldn't respond just now. Anything you wrote is saved, so try again in a few minutes.");
-    throw new LlmError("provider_error", "Postory's AI is busy. Nothing was lost, so try again in a minute.");
-  }
-}
-
-function withSchema(system: string, schema: z.ZodType) {
-  return `${system}\n\nRespond with only one JSON object that matches this JSON Schema. No prose, no code fences.\n${JSON.stringify(jsonSchemaFor(schema))}`;
-}
-
-type TextProvider = "sambanova" | "replicate";
-
-function textProviders(): TextProvider[] {
-  const all: TextProvider[] = [];
-  if (integrations.sambanova()) all.push("sambanova");
-  if (integrations.replicate()) all.push("replicate");
-  const ready = all.filter((p) => (benched.get(p) ?? 0) < Date.now());
-  return ready.length ? ready : all;
-}
-
-async function askOnce(provider: TextProvider, input: StructuredInput<z.ZodType>): Promise<unknown> {
-  const system = withSchema(input.system, input.schema);
-  if (provider === "sambanova") {
-    const model = input.tier === "fast" ? env.sambanovaFastModel() : env.sambanovaModel();
-    return extractObject(await sambanova(model, system, input.turns, input.tier === "fast" ? 2048 : 6000));
-  }
-  const model = input.tier === "fast" ? env.replicateFastModel() : env.replicateTextModel();
-  const prompt =
-    input.turns.length === 1 ? input.turns[0].content : input.turns.map((t) => `${t.role === "user" ? "User" : "Assistant"}: ${t.content}`).join("\n\n");
-  return extractObject(await predict(model, { system_prompt: system, prompt, max_tokens: input.tier === "fast" ? 2048 : 6000 }, 150_000, "text"));
-}
-
-/**
- * One structured call: a system prompt, the conversation (or a single user
- * message), and the schema the answer must follow. SambaNova answers first;
- * Replicate takes over if SambaNova is busy or refuses. A malformed answer is
- * retried once. Returns the parsed object (callers still apply their own
- * validated schema with length limits).
- */
-export async function generateStructured<S extends z.ZodType>(input: StructuredInput<S>): Promise<z.infer<S>> {
-  const providers = textProviders();
-  if (!providers.length) throw new LlmError("unavailable", "Postory's AI isn't set up on this deployment yet.");
-
-  let lastError: unknown = null;
-  for (const provider of providers) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const result = input.schema.safeParse(await askOnce(provider, input));
-        if (!result.success) throw new LlmError("invalid_output", "Postory's AI returned something it couldn't use. Try again.");
-        benched.delete(provider);
-        return result.data;
-      } catch (error) {
-        lastError = error;
-        if (error instanceof LlmError && error.code === "invalid_output" && attempt === 0) {
-          log.warn("model output rejected, retrying", { operation: `ai.${input.name}`, provider, attempt });
-          continue;
-        }
-        if (error instanceof LlmError && error.code === "unavailable") benched.set(provider, Date.now() + 10 * 60_000);
-        // Busy, refused or still malformed: hand over to the next provider.
-        if (error instanceof LlmError || error instanceof ConfigurationError) break;
-        throw error;
-      }
-    }
-  }
-  throw lastError instanceof Error ? lastError : new LlmError("provider_error", "Postory's AI hit a problem. Try again.");
-}
-
-// --- Images ---------------------------------------------------------------------
 
 export type ImageShape = "square" | "portrait" | "landscape";
 type ImageResult = { bytes: Buffer; contentType: string; extension: string };
@@ -277,7 +294,6 @@ export async function generateImageBytes(prompt: string, shape: ImageShape): Pro
     env.replicateImageModel(),
     { prompt: prompt.slice(0, 2000), aspect_ratio: ASPECT[shape], output_format: "jpg", output_quality: 90, safety_tolerance: 2 },
     150_000,
-    "image",
   );
   const url = Array.isArray(output) ? output[0] : output;
   if (typeof url !== "string" || !url.startsWith("https://")) throw new LlmError("invalid_output", "No image came back. Try again.");

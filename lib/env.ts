@@ -40,14 +40,15 @@ export const env = {
   handypayApiKey: () => read("HANDYPAY_API_KEY"),
   handypayBaseUrl: () => (read("HANDYPAY_API_BASE_URL") ?? "https://api.handypay.me/api").replace(/\/+$/, ""),
 
-  // SambaNova Cloud writes first (OpenAI-compatible chat API); Replicate is the fallback and makes images.
-  sambanovaApiKey: () => read("SAMBANOVA_API_KEY"),
-  sambanovaModel: () => read("SAMBANOVA_MODEL") ?? "DeepSeek-V3.1",
-  sambanovaFastModel: () => read("SAMBANOVA_FAST_MODEL") ?? "Meta-Llama-3.3-70B-Instruct",
+  // GitHub Models writes all text (OpenAI-compatible chat completions).
+  githubModelsToken: () => read("GITHUB_MODELS_TOKEN"),
+  githubModelsBaseUrl: () => (read("GITHUB_MODELS_BASE_URL") ?? "https://models.inference.ai.azure.com").replace(/\/+$/, ""),
+  githubModelsModel: () => read("GITHUB_MODELS_MODEL") ?? "meta-llama-3-70b-instruct",
+  githubModelsFastModel: () => read("GITHUB_MODELS_FAST_MODEL") ?? read("GITHUB_MODELS_MODEL") ?? "meta-llama-3-70b-instruct",
+  /** Output budget per request. Llama 3 70B has an 8k-token window shared with the prompt. */
+  githubModelsMaxTokens: () => Number(read("GITHUB_MODELS_MAX_TOKENS") ?? 3000),
+  // Replicate makes images only.
   replicateApiToken: () => read("REPLICATE_API_TOKEN"),
-  // Replicate runs all of Postory's AI. Text models take prompt + system_prompt; see lib/ai/llm.ts.
-  replicateTextModel: () => read("REPLICATE_TEXT_MODEL") ?? "anthropic/claude-4.5-sonnet",
-  replicateFastModel: () => read("REPLICATE_FAST_MODEL") ?? "anthropic/claude-4.5-haiku",
   replicateImageModel: () => read("REPLICATE_IMAGE_MODEL") ?? "black-forest-labs/flux-1.1-pro",
 
   // Any SMTP mailbox (e.g. Zoho Mail: smtp.zoho.com, 465). Used when the Zoho API isn't set.
@@ -67,6 +68,7 @@ export const env = {
   /** Sign-up and reset codes by email; switched on only once delivery is confirmed. */
   authEmailCodes: () => read("AUTH_EMAIL_CODES") === "on",
   emailTestToken: () => read("EMAIL_TEST_TOKEN"),
+  aiCheckToken: () => read("AI_CHECK_TOKEN"),
 
   // Google sign-in through Privy. The app id is public; the secret stays here.
   privyAppId: () => read("PRIVY_APP_ID") ?? read("NEXT_PUBLIC_PRIVY_APP_ID"),
@@ -82,7 +84,7 @@ export const integrations = {
   privy: () => Boolean(env.privyAppId() && env.privyAppSecret()),
   handypay: () => Boolean(env.handypayApiKey()),
   replicate: () => Boolean(env.replicateApiToken()),
-  sambanova: () => Boolean(env.sambanovaApiKey()),
+  githubModels: () => Boolean(env.githubModelsToken()),
   smtp: () => Boolean(env.smtpHost() && env.smtpUser() && env.smtpPassword()),
   zoho: () => Boolean(env.zohoClientId() && env.zohoClientSecret() && env.zohoRefreshToken() && env.zohoAccountId()),
   /** Postory can send email from its own address (Zoho or SMTP). */
@@ -99,7 +101,7 @@ export function integrationStatus(): IntegrationStatus {
     privy: integrations.privy(),
     handypay: integrations.handypay(),
     replicate: integrations.replicate(),
-    sambanova: integrations.sambanova(),
+    githubModels: integrations.githubModels(),
     smtp: integrations.smtp(),
     zoho: integrations.zoho(),
     email: integrations.email(),
